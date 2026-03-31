@@ -14,6 +14,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [recentJobs, setRecentJobs] = useState<RecentJob[]>([]);
+  const [fidelityMode, setFidelityMode] = useState<'aeo-first' | 'brand-first'>('aeo-first');
 
   useEffect(() => {
     try {
@@ -33,7 +34,7 @@ export default function HomePage() {
       const res = await fetch('/api/clone/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url.trim() }),
+        body: JSON.stringify({ url: url.trim(), fidelityMode }),
       });
 
       const data = await res.json();
@@ -120,10 +121,10 @@ export default function HomePage() {
           <form onSubmit={handleSubmit} className="w-full max-w-xl mt-2">
             <div className="input-glow flex rounded-lg border border-border/60 bg-card overflow-hidden transition-all">
               <input
-                type="url"
+                type="text"
                 value={url}
                 onChange={e => setUrl(e.target.value)}
-                placeholder="https://example.com"
+                placeholder="m11studio.com or https://example.com"
                 className="flex-1 bg-transparent px-4 py-4 text-sm font-mono text-foreground placeholder:text-muted-foreground/40 outline-none"
                 disabled={loading}
                 autoFocus
@@ -146,8 +147,42 @@ export default function HomePage() {
             {error && (
               <p className="mt-2 text-[11px] font-mono text-alias-red text-left px-1">✗ {error}</p>
             )}
+
+            {/* Fidelity Mode Toggle — Option 5 */}
+            <div className="mt-4 flex flex-col gap-1.5">
+              <p className="text-[9px] font-mono uppercase tracking-[0.2em] text-muted-foreground/50">Output Mode</p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFidelityMode('aeo-first')}
+                  className={`flex-1 px-3 py-2.5 rounded border text-[10px] font-mono uppercase tracking-[0.15em] transition-all ${
+                    fidelityMode === 'aeo-first'
+                      ? 'border-alias-green bg-alias-green/10 text-alias-green'
+                      : 'border-border/40 text-muted-foreground/50 hover:border-border hover:text-foreground'
+                  }`}
+                >
+                  <span className="block text-[8px] mb-0.5 opacity-60">◈</span>
+                  AEO-First
+                  <span className="block text-[8px] mt-0.5 opacity-50 normal-case tracking-normal">Rewrites structure for AI</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFidelityMode('brand-first')}
+                  className={`flex-1 px-3 py-2.5 rounded border text-[10px] font-mono uppercase tracking-[0.15em] transition-all ${
+                    fidelityMode === 'brand-first'
+                      ? 'border-alias-amber bg-alias-amber/10 text-alias-amber'
+                      : 'border-border/40 text-muted-foreground/50 hover:border-border hover:text-foreground'
+                  }`}
+                >
+                  <span className="block text-[8px] mb-0.5 opacity-60">◉</span>
+                  Brand-First
+                  <span className="block text-[8px] mt-0.5 opacity-50 normal-case tracking-normal">Keeps original layout + fonts</span>
+                </button>
+              </div>
+            </div>
+
             <p className="mt-2 text-[10px] font-mono text-muted-foreground/40 text-left px-1">
-              Powered by Firecrawl + Gemini 2.0 Flash. Any public URL works.
+              Powered by Firecrawl + Gemini 2.5 Flash. Any public URL works.
             </p>
           </form>
 

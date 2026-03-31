@@ -5,6 +5,15 @@ import { AeoScoreGrid } from '@/components/aeo-score-ring';
 
 type Props = { params: Promise<{ jobId: string }> };
 
+interface PageSummary {
+  slug: string;
+  title: string;
+  url: string;
+  status: 'pending' | 'running' | 'done' | 'error';
+  /** Section types available on this page, for the refine panel */
+  sectionTypes?: string[];
+}
+
 interface AeoScore {
   overall: number;
   content_structure: number;
@@ -14,6 +23,7 @@ interface AeoScore {
   aiSummary: string;
   recommendations: string[];
   canSummarizeIn2Sentences: boolean;
+  missingPageSuggestions?: string[];
 }
 
 export default function PreviewPage({ params }: Props) {
@@ -25,8 +35,23 @@ export default function PreviewPage({ params }: Props) {
   const [originalUrl, setOriginalUrl] = useState('');
   const [previewReady, setPreviewReady] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [pages, setPages] = useState<PageSummary[]>([]);
+  const [activePage, setActivePage] = useState('home');
 
-  const previewSrc = `/api/clone/preview/${jobId}`;
+  // ── Refine panel state ────────────────────────────────────────────────────
+  const [refineOpen, setRefineOpen]           = useState(false);
+  const [refineSection, setRefineSection]     = useState('');
+  const [refineInstruction, setRefineInstruction] = useState('');
+  const [refineStatus, setRefineStatus]       = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [refineError, setRefineError]         = useState('');
+  // Used to force iframe remount after a successful refinement
+  const [previewKey, setPreviewKey]           = useState(0);
+
+  // iframe src changes with selected page
+  const previewSrc = `/api/clone/preview/${jobId}?page=${activePage}`;
+
+  // Sections available on the currently active page
+  const activeSections = pages.find(p => p.slug === activePage)?.sectionTypes ?? [];
 
   const copyLink = useCallback(() => {
     navigator.clipboard.writeText(window.location.href).then(() => {
@@ -38,11 +63,18 @@ export default function PreviewPage({ params }: Props) {
   useEffect(() => {
     const loadJobData = async () => {
       try {
-        // Load status (score, url, etc.)
         const statusRes = await fetch(`/api/clone/status/${jobId}`);
         if (statusRes.ok) {
           const data = await statusRes.json();
           if (data.url) setOriginalUrl(data.url);
+          if (data.pages?.length > 0) {
+            // Map pages and extract section types if available
+            const mapped = data.pages.map((p: PageSummary & { aeoContent?: { sections: { type: string }[] } }) => ({
+              ...p,
+              sectionTypes: p.aeoContent?.sections.map((s: { type: string }) => s.type) ?? [],
+            }));
+            setPages(mapped);
+          }
           if (data.phases?.audit?.score) {
             const s = data.phases.audit.score;
             setScore(s);
@@ -51,12 +83,10 @@ export default function PreviewPage({ params }: Props) {
           }
         }
 
-        // Check if preview HTML is ready
         const previewRes = await fetch(`/api/clone/preview/${jobId}`, { method: 'HEAD' });
         if (previewRes.ok) setPreviewReady(true);
       } catch { /* ignore */ }
 
-      // Also check localStorage for URL
       try {
         const stored = localStorage.getItem('alias-compiler-jobs');
         if (stored) {
@@ -70,9 +100,41 @@ export default function PreviewPage({ params }: Props) {
     loadJobData();
   }, [jobId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Refine submit handler ────────────────────────────────────────────────
+  const handleRefine = useCallback(async () => {
+    if (!refineSection || !refineInstruction.trim()) return;
+    setRefineStatus('loading');
+    setRefineError('');
+    try {
+      const res = await fetch(`/api/clone/refine/${jobId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pageSlug:    activePage,
+          sectionType: refineSection,
+          instruction: refineInstruction,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Refinement failed');
+      }
+      setRefineStatus('success');
+      setRefineInstruction('');
+      // Force iframe remount to show updated page
+      setPreviewKey(k => k + 1);
+      setTimeout(() => setRefineStatus('idle'), 3000);
+    } catch (err) {
+      setRefineStatus('error');
+      setRefineError(err instanceof Error ? err.message : 'Unknown error');
+    }
+  }, [jobId, activePage, refineSection, refineInstruction]);
+
+  const donePagesCount = pages.filter(p => p.status === 'done').length;
+
   return (
     <main className="min-h-screen bg-background flex flex-col">
-      {/* Nav */}
+      {/* Top Nav */}
       <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-3 border-b border-border/30 bg-background/90 backdrop-blur-md gap-3">
         <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity flex-shrink-0">
           <span className="text-[9px] font-mono uppercase tracking-[0.3em] text-muted-foreground">ALIAS</span>
@@ -112,7 +174,6 @@ export default function PreviewPage({ params }: Props) {
               target="_blank"
               rel="noopener noreferrer"
               className="px-3 py-2 text-[9px] font-mono uppercase tracking-wider border border-border text-muted-foreground rounded hover:text-foreground hover:border-foreground/30 transition-all"
-              title="Open rebuilt site in full window"
             >
               ↗ Full View
             </a>
@@ -144,23 +205,147 @@ export default function PreviewPage({ params }: Props) {
           <div className="flex-1 flex flex-col">
             {previewReady ? (
               <>
-                <div className="px-4 py-2 border-b border-border/30 bg-card/50 flex items-center gap-3 flex-shrink-0">
+                {/* Status bar + page switcher */}
+                <div className="px-4 py-2 border-b border-border/30 bg-card/50 flex items-center gap-4 flex-shrink-0 flex-wrap">
                   <div className="flex items-center gap-1.5">
                     <div className="w-2 h-2 rounded-full bg-alias-green" />
                     <span className="text-[9px] font-mono text-alias-green uppercase tracking-wider">AEO-Optimised</span>
                   </div>
+
+                  {/* Page switcher tabs — only shown when multiple pages exist */}
+                  {pages.length > 1 && (
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {pages.map(p => (
+                        <button
+                          key={p.slug}
+                          onClick={() => setActivePage(p.slug)}
+                          disabled={p.status !== 'done'}
+                          title={p.status !== 'done' ? `${p.title}: ${p.status}` : p.title}
+                          className={`px-2.5 py-1 text-[9px] font-mono uppercase tracking-wider rounded transition-all border ${
+                            activePage === p.slug
+                              ? 'bg-alias-green text-background border-alias-green font-bold'
+                              : p.status === 'done'
+                              ? 'text-muted-foreground border-border hover:text-foreground hover:border-foreground/30'
+                              : p.status === 'running'
+                              ? 'text-alias-amber border-alias-amber/30 opacity-60 cursor-wait'
+                              : p.status === 'error'
+                              ? 'text-alias-red border-alias-red/30 opacity-60 cursor-not-allowed'
+                              : 'text-muted-foreground/30 border-border/20 opacity-40 cursor-not-allowed'
+                          }`}
+                        >
+                          {p.status === 'running' ? '⟳ ' : p.status === 'error' ? '✗ ' : ''}
+                          {p.title}
+                        </button>
+                      ))}
+                      <span className="text-[9px] font-mono text-muted-foreground/40 ml-1">
+                        {donePagesCount}/{pages.length} pages
+                      </span>
+                    </div>
+                  )}
+
                   {originalUrl && (
-                    <span className="text-[9px] font-mono text-muted-foreground/50 truncate">
+                    <span className="text-[9px] font-mono text-muted-foreground/50 truncate ml-auto">
                       rebuilt from: {originalUrl}
                     </span>
                   )}
                 </div>
+
                 <iframe
+                  key={`${previewSrc}-${previewKey}`} // remount on page change OR after refinement
                   src={previewSrc}
                   className="flex-1 w-full border-0"
                   title="Rebuilt AEO-optimised site preview"
                   sandbox="allow-same-origin allow-popups"
                 />
+
+                {/* ── Refine Panel ─────────────────────────────────────── */}
+                <div className={`border-t border-border/30 bg-card/80 backdrop-blur-sm transition-all duration-300 ${
+                  refineOpen ? 'max-h-72' : 'max-h-10'
+                } overflow-hidden flex-shrink-0`}>
+
+                  {/* Panel header / toggle */}
+                  <button
+                    onClick={() => setRefineOpen(o => !o)}
+                    className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-foreground/5 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-alias-green text-[10px]">✦</span>
+                      <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-foreground/70">Refine Section</span>
+                      {activeSections.length === 0 && (
+                        <span className="text-[9px] font-mono text-muted-foreground/40">(no schema available)</span>
+                      )}
+                    </div>
+                    <span className="text-[9px] font-mono text-muted-foreground/50">
+                      {refineOpen ? '▼' : '▲'}
+                    </span>
+                  </button>
+
+                  {/* Panel body */}
+                  <div className="px-4 pb-4 space-y-3">
+                    <div className="flex items-start gap-3">
+                      {/* Section selector */}
+                      <div className="flex-shrink-0">
+                        <p className="text-[9px] font-mono text-muted-foreground/50 uppercase tracking-wider mb-1.5">Section</p>
+                        <select
+                          value={refineSection}
+                          onChange={e => setRefineSection(e.target.value)}
+                          className="bg-background border border-border rounded px-2 py-1.5 text-[10px] font-mono text-foreground min-w-[120px] focus:outline-none focus:border-alias-green/50"
+                        >
+                          <option value="">Select...</option>
+                          {(activeSections.length > 0
+                            ? activeSections
+                            : ['hero', 'features', 'services', 'about', 'cta', 'faq', 'testimonials']
+                          ).map(type => (
+                            <option key={type} value={type}>{type}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Instruction input */}
+                      <div className="flex-1">
+                        <p className="text-[9px] font-mono text-muted-foreground/50 uppercase tracking-wider mb-1.5">Instruction</p>
+                        <textarea
+                          value={refineInstruction}
+                          onChange={e => setRefineInstruction(e.target.value)}
+                          placeholder='e.g. "Make the hero darker with a full-bleed background"'
+                          rows={2}
+                          className="w-full bg-background border border-border rounded px-3 py-2 text-xs font-mono text-foreground resize-none focus:outline-none focus:border-alias-green/50 placeholder:text-muted-foreground/30"
+                        />
+                      </div>
+
+                      {/* Submit */}
+                      <div className="flex-shrink-0 pt-5">
+                        <button
+                          onClick={handleRefine}
+                          disabled={!refineSection || !refineInstruction.trim() || refineStatus === 'loading'}
+                          className={`px-4 py-2 text-[9px] font-mono uppercase tracking-wider rounded border transition-all ${
+                            refineStatus === 'loading'
+                              ? 'border-alias-green/30 text-alias-green/50 cursor-wait'
+                              : refineStatus === 'success'
+                              ? 'border-alias-green bg-alias-green/10 text-alias-green'
+                              : 'border-alias-green text-alias-green hover:bg-alias-green/10 disabled:opacity-30 disabled:cursor-not-allowed'
+                          }`}
+                        >
+                          {refineStatus === 'loading' ? '⟳ Refining...' :
+                           refineStatus === 'success' ? '✓ Applied' :
+                           '✦ Refine'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Status messages */}
+                    {refineStatus === 'error' && (
+                      <p className="text-[9px] font-mono text-alias-red">
+                        ✗ {refineError}
+                      </p>
+                    )}
+                    {refineStatus === 'success' && (
+                      <p className="text-[9px] font-mono text-alias-green">
+                        ✓ Section refined — preview updated
+                      </p>
+                    )}
+                  </div>
+                </div>
               </>
             ) : (
               <div className="flex-1 flex items-center justify-center">
@@ -201,9 +386,7 @@ export default function PreviewPage({ params }: Props) {
                     <div className="space-y-4">
                       {/* AI Summary */}
                       <div className="bg-card border border-alias-green/30 rounded-lg p-4">
-                        <p className="text-[9px] font-mono uppercase tracking-[0.2em] text-muted-foreground mb-3">
-                          AI Summary Test
-                        </p>
+                        <p className="text-[9px] font-mono uppercase tracking-[0.2em] text-muted-foreground mb-3">AI Summary Test</p>
                         <div className="flex items-center gap-2 mb-3">
                           <span className={`text-[10px] font-mono ${score.canSummarizeIn2Sentences ? 'text-alias-green' : 'text-alias-red'}`}>
                             {score.canSummarizeIn2Sentences ? '✓ AI can summarize this site in 2 sentences' : '✗ AI struggles to summarize — needs clearer structure'}
@@ -250,6 +433,50 @@ export default function PreviewPage({ params }: Props) {
                     </div>
                   </div>
 
+                  {/* Pages coverage */}
+                  {pages.length > 0 && (
+                    <div className="bg-card border border-border rounded-lg p-6">
+                      <p className="text-[9px] font-mono uppercase tracking-[0.2em] text-muted-foreground mb-4">
+                        Pages Crawled &amp; Rebuilt
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {pages.map(p => (
+                          <span
+                            key={p.slug}
+                            className={`px-2.5 py-1 text-[9px] font-mono rounded border ${
+                              p.status === 'done'
+                                ? 'border-alias-green/40 text-alias-green bg-alias-green/5'
+                                : p.status === 'error'
+                                ? 'border-alias-red/40 text-alias-red bg-alias-red/5'
+                                : 'border-border text-muted-foreground'
+                            }`}
+                          >
+                            {p.status === 'done' ? '✓' : p.status === 'error' ? '✗' : '○'} {p.title}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Missing page suggestions */}
+                  {score.missingPageSuggestions && score.missingPageSuggestions.length > 0 && (
+                    <div className="bg-card border border-alias-amber/30 rounded-lg p-6">
+                      <p className="text-[9px] font-mono uppercase tracking-[0.2em] text-alias-amber mb-4">
+                        ⚠ Recommended Missing Pages (for AEO Completeness)
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {score.missingPageSuggestions.map((page, i) => (
+                          <span key={i} className="px-2.5 py-1 text-[9px] font-mono rounded border border-alias-amber/30 text-alias-amber bg-alias-amber/5">
+                            + {page}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="text-[9px] font-mono text-muted-foreground/50 mt-3">
+                        Adding these pages would improve AI discoverability and answer coverage for this business type.
+                      </p>
+                    </div>
+                  )}
+
                   {/* Recommendations */}
                   {recommendations.length > 0 && (
                     <div className="bg-card border border-border rounded-lg p-6">
@@ -269,9 +496,7 @@ export default function PreviewPage({ params }: Props) {
                 </>
               ) : (
                 <div className="bg-card border border-border rounded-lg p-8 text-center space-y-4">
-                  <p className="text-sm font-mono text-muted-foreground">
-                    AEO score not available yet.
-                  </p>
+                  <p className="text-sm font-mono text-muted-foreground">AEO score not available yet.</p>
                   <Link href={`/clone/${jobId}`} className="text-alias-green text-sm font-mono underline">
                     ← Back to pipeline to run the audit
                   </Link>

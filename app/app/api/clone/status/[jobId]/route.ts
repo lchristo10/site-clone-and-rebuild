@@ -16,6 +16,16 @@ export async function GET(_req: NextRequest, ctx: RouteContext) {
     url: job.url,
     status: job.status,
     createdAt: job.createdAt,
+    // Expose built pages as a summary list (no HTML) for the page-switcher UI
+    pages: Object.values(job.pages).map(p => ({
+      slug:       p.slug,
+      title:      p.title,
+      url:        p.url,
+      status:     p.status,
+      // Include aeoContent so the preview Refine panel knows which sections exist
+      aeoContent: p.aeoContent,
+    })),
+
     phases: {
       extract: {
         status: job.phases.extract.status,
@@ -27,12 +37,10 @@ export async function GET(_req: NextRequest, ctx: RouteContext) {
         tokens: job.phases.analyze.tokens,
         entityMap: job.phases.analyze.entityMap,
       },
-      draft: {
-        status: job.phases.draft.status,
-      },
+      draft: { status: job.phases.draft.status },
       synthesize: {
         status: job.phases.synthesize.status,
-        hasHtml: !!job.phases.synthesize.builtHtml,
+        hasHtml: !!job.phases.synthesize.builtHtml || !!job.pages['home']?.html,
       },
       audit: {
         status: job.phases.audit.status,

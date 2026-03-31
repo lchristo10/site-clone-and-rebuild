@@ -54,78 +54,98 @@ export function TerminalLog({ jobId, onComplete }: TerminalLogProps) {
   }, [jobId]);
 
   useEffect(() => {
-    const es = new EventSource(`/api/clone/stream/${jobId}`);
-    esRef.current = es;
-
-    es.onmessage = (e) => {
-      try {
-        const event: StreamEvent = JSON.parse(e.data);
-
-        if (event.phase !== 'system') {
-          const phase = event.phase as Phase;
-          if (event.status === 'running') {
-            setPhases(prev => ({ ...prev, [phase]: 'running' }));
-            setPhaseStartTimes(prev => ({ ...prev, [phase]: Date.now() }));
-          } else if (event.status === 'done' || event.status === 'error') {
-            setPhases(prev => ({ ...prev, [phase]: event.status as PhaseStatus }));
-            setPhaseStartTimes(prev => {
-              const start = prev[phase];
-              if (start) {
-                setPhaseDurations(d => ({ ...d, [phase]: Date.now() - start }));
-              }
-              return prev;
-            });
-          }
-        }
-
-        addLine(event.phase, event.message, event.status as LogLine['type']);
-
-        // Extract special data payloads
-        if (event.phase === 'extract' && event.status === 'done' && event.data) {
-          const d = event.data as { screenshotUrl?: string; meta?: { title?: string; description?: string } };
-          if (d.screenshotUrl) setScreenshotUrl(d.screenshotUrl);
-        }
-
-        if (event.phase === 'analyze' && event.status === 'done' && event.data) {
-          const d = event.data as { tokens?: DesignTokens; entityMap?: EntityMap };
-          if (d.tokens) setTokens(d.tokens);
-          if (d.entityMap) setEntityMap(d.entityMap);
-        }
-
-        if (event.phase === 'audit' && event.status === 'done' && event.data) {
-          setScore(event.data as AeoScore);
-        }
-
-        if (event.phase === 'system' && event.status === 'done') {
-          isDoneRef.current = true;
-          setIsDone(true);
-          setTotalDuration(Date.now() - startTime);
-          es.close();
-          onComplete?.(screenshotUrl || undefined);
-        }
-
-        if (event.phase === 'system' && event.status === 'error') {
-          setError(event.message);
-          es.close();
-        }
-      } catch {
-        // ignore parse errors
+    // Pre-check: if the job doesn't exist (e.g. server restarted and cleared
+    // the in-memory store), show a clear message before opening the SSE.
+    fetch(`/api/clone/status/${jobId}`).then(r => {
+      if (r.status === 404) {
+        setError('Job not found — it may have expired after a server restart. Please start a new job from the homepage.');
+        return;
       }
-    };
 
-    es.onerror = () => {
-      // Guard against false-positives: the SSE stream closing after a successful
-      // completion also fires onerror. Use a ref (not stale state) to check.
-      setTimeout(() => {
-        if (!isDoneRef.current) {
-          setError('Pipeline connection closed. The job may still be processing — check back shortly.');
+      // Job exists — open the SSE stream
+      const es = new EventSource(`/api/clone/stream/${jobId}`);
+      esRef.current = es;
+
+      es.onmessage = (e) => {
+        try {
+          const event: StreamEvent = JSON.parse(e.data);
+
+          if (event.phase !== 'system') {
+            const phase = event.phase as Phase;
+            if (event.status === 'running') {
+              setPhases(prev => ({ ...prev, [phase]: 'running' }));
+              setPhaseStartTimes(prev => ({ ...prev, [phase]: Date.now() }));
+            } else if (event.status === 'done' || event.status === 'error') {
+              setPhases(prev => ({ ...prev, [phase]: event.status as PhaseStatus }));
+              setPhaseStartTimes(prev => {
+                const start = prev[phase];
+                if (start) {
+                  setPhaseDurations(d => ({ ...d, [phase]: Date.now() - start }));
+                }
+                return prev;
+              });
+            }
+          }
+
+          addLine(event.phase, event.message, event.status as LogLine['type']);
+
+          if (event.phase === 'extract' && event.status === 'done' && event.data) {
+            const d = event.data as { screenshotUrl?: string; meta?: { title?: string; description?: string } };
+            if (d.screenshotUrl) setScreenshotUrl(d.screenshotUrl);
+          }
+
+          if (event.phase === 'analyze' && event.status === 'done' && event.data) {
+            const d = event.data as { tokens?: DesignTokens; entityMap?: EntityMap };
+            if (d.tokens) setTokens(d.tokens);
+            if (d.entityMap) setEntityMap(d.entityMap);
+          }
+
+          if (event.phase === 'audit' && event.status === 'done' && event.data) {
+            setScore(event.data as AeoScore);
+          }
+
+          if (event.phase === 'system' && event.status === 'done') {
+            isDoneRef.current = true;
+            setIsDone(true);
+            setTotalDuration(Date.now() - startTime);
+            es.close();
+            onComplete?.(screenshotUrl || undefined);
+          }
+
+          if (event.phase === 'system' && event.status === 'error') {
+            setError(event.message);
+            es.close();
+          }
+        } catch {
+          // ignore parse errors
         }
-        es.close();
-      }, 300);
-    };
+      };
+
+      es.onerror = () => {
+        setTimeout(async () => {
+          if (!isDoneRef.current) {
+            // Re-check whether the job still exists so we can show an accurate message.
+            // EventSource.onerror doesn't expose the HTTP status code, so we probe manually.
+            try {
+              const r = await fetch(`/api/clone/status/${jobId}`);
+              if (r.status === 404) {
+                setError('Job not found — it may have expired after a server restart. Please start a new job from the homepage.');
+              } else {
+                setError('Connection to the pipeline closed unexpectedly. Please try again.');
+              }
+            } catch {
+              setError('Connection to the pipeline closed unexpectedly. Please try again.');
+            }
+          }
+          es.close();
+        }, 300);
+      };
+    }).catch(() => {
+      setError('Could not reach the server. Please check your connection and try again.');
+    });
 
     return () => {
-      es.close();
+      esRef.current?.close();
     };
   }, [jobId]); // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -1,25 +1,34 @@
-import { AeoContent, AeoSection, DesignTokens, EntityMap } from './types';
+import { AeoContent, AeoSection, BrandDNA, DesignTokens, EntityMap } from './types';
+import { brandDnaToCssTokens } from './brand-dna';
 
-function cssFromTokens(tokens: DesignTokens): string {
-  const { colors, typography, spacing } = tokens;
+function cssFromTokens(tokens: DesignTokens, brandDna?: BrandDNA): string {
+  const { typography, spacing } = tokens;
 
-  // Derive a slightly darker version of primary for hover states
+  // When Brand DNA is available, its semantic tokens override the raw hex values.
+  // The functional --c-* aliases inside brandDnaToCssTokens reference var(--color-brand-*)
+  // so everything cascades from one source of truth.
+  const colorBlock = brandDna
+    ? brandDnaToCssTokens(brandDna)
+    : `
+  --c-primary:   ${tokens.colors.primary};
+  --c-secondary: ${tokens.colors.secondary};
+  --c-surface:   ${tokens.colors.surface};
+  --c-text:      ${tokens.colors.text};
+  --c-accent:    ${tokens.colors.accent};
+  --c-border:    ${tokens.colors.border || 'rgba(0,0,0,0.08)'};
+  --c-muted:     color-mix(in srgb, ${tokens.colors.text} 60%, ${tokens.colors.surface});`.trimStart();
+
   return `
     /* ─── Design Tokens ─────────────────────────────────────────── */
     :root {
-      --c-primary:   ${colors.primary};
-      --c-secondary: ${colors.secondary};
-      --c-surface:   ${colors.surface};
-      --c-text:      ${colors.text};
-      --c-accent:    ${colors.accent};
-      --c-border:    ${colors.border || 'rgba(0,0,0,0.08)'};
+      ${colorBlock}
 
-      --f-heading: '${typography.headingFont}', system-ui, -apple-system, sans-serif;
-      --f-body:    '${typography.bodyFont}', system-ui, -apple-system, sans-serif;
+      --f-heading: '${brandDna?.typePairing.heading ?? typography.headingFont}', system-ui, -apple-system, sans-serif;
+      --f-body:    '${brandDna?.typePairing.body    ?? typography.bodyFont}', system-ui, -apple-system, sans-serif;
       --f-size:    ${typography.baseSizePx}px;
       --f-scale:   ${typography.scaleRatio || 1.25};
 
-      --w-container: min(${spacing.containerWidthPx}px, 100%);
+      --w-container: min(max(${spacing.containerWidthPx}px, 70vw), 96vw);
       --s-section:   clamp(${Math.round(spacing.sectionPaddingPx * 0.6)}px, 8vw, ${spacing.sectionPaddingPx}px);
       --s-gap:       ${spacing.columnGapPx}px;
 
@@ -62,7 +71,7 @@ function cssFromTokens(tokens: DesignTokens): string {
     h3 { font-size: clamp(1.15rem, 2vw, 1.5rem); margin-bottom: 0.6rem; }
     h4 { font-size: 1.1rem; margin-bottom: 0.5rem; }
 
-    p { margin-bottom: 1rem; max-width: 66ch; line-height: 1.75; }
+    p { margin-bottom: 1rem; max-width: 80ch; line-height: 1.75; }
     p:last-child { margin-bottom: 0; }
     a { color: var(--c-primary); text-decoration: underline; text-decoration-skip-ink: auto; transition: opacity var(--transition); }
     a:hover { opacity: 0.75; }
@@ -263,16 +272,20 @@ function cssFromTokens(tokens: DesignTokens): string {
       box-shadow: var(--shadow-md);
     }
     .feature-card__icon {
-      width: 44px;
-      height: 44px;
+      width: 48px;
+      height: 48px;
       border-radius: var(--radius-md);
-      background: color-mix(in srgb, var(--c-primary) 12%, transparent);
-      border: 1px solid color-mix(in srgb, var(--c-primary) 20%, transparent);
+      background: color-mix(in srgb, var(--c-primary) 10%, transparent);
+      border: 1px solid color-mix(in srgb, var(--c-primary) 18%, transparent);
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-bottom: 1rem;
-      font-size: 1.25rem;
+      margin-bottom: 1.25rem;
+      color: var(--c-primary);
+      flex-shrink: 0;
+    }
+    .feature-card__icon svg {
+      display: block;
     }
     .feature-card h3 {
       color: var(--c-text);
@@ -641,28 +654,182 @@ function googleFontsLink(tokens: DesignTokens): string {
 }
 
 // Feature icons based on common categories
+// ── SVG icon helpers ─────────────────────────────────────────────────────────
+// Each value is a self-contained inline SVG (24×24 viewport, currentColor stroke).
+// Keys are lowercase keywords matched against the card title.
+
+function svg(path: string, extra = ''): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${extra}>${path}</svg>`;
+}
+
 const FEATURE_ICONS: Record<string, string> = {
-  default: '◈',
-  speed: '⚡',
-  security: '🔒',
-  data: '📊',
-  ai: '🤖',
-  cloud: '☁',
-  mobile: '📱',
-  integration: '🔗',
-  analytics: '📈',
-  support: '💬',
-  team: '👥',
-  automation: '⚙',
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // BEAUTY / HAIR   (compound keywords first — they are longer so they match
+  // before generic fallbacks like 'hair', 'cut', 'style', 'color')
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // Scissors — "haircuts", "precision cuts", "gents cut"
+  'haircut':      svg('<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/>'),
+  'precision cut':svg('<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/>'),
+
+  // Palette — "hair coloring", "hair colouring", "balayage", "highlights", "toning"
+  'hair color':   svg('<circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>'),
+  'hair colour':  svg('<circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>'),
+  'coloring':     svg('<circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>'),
+  'colouring':    svg('<circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>'),
+  'highlights':   svg('<circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>'),
+  'balayage':     svg('<circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>'),
+
+  // Wand/sparkles — "hair styling", "blowouts", "updos", "styling"
+  'hair styling': svg('<path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72z"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/>'),
+  'styling':      svg('<path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72z"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/>'),
+  'blowout':      svg('<path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72z"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/>'),
+  'updo':         svg('<path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72z"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/>'),
+
+  // Droplet — "conditioning", "hair treatments", "deep condition", "repair", "scalp", "keratin"
+  'conditioning': svg('<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>'),
+  'treatment':    svg('<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>'),
+  'keratin':      svg('<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>'),
+  'scalp':        svg('<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>'),
+  'repair':       svg('<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>'),
+
+  // User — "consultation", "personalized", "personal"
+  'consultation': svg('<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'),
+  'consult':      svg('<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'),
+  'personal':     svg('<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'),
+
+  // Star — "bridal", "special occasion", "wedding", "event"
+  'bridal':       svg('<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>'),
+  'occasion':     svg('<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>'),
+  'wedding':      svg('<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>'),
+
+  // Generic beauty fallbacks
+  'hair':         svg('<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/>'),
+  'cut':          svg('<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/>'),
+  'color':        svg('<circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>'),
+  'colour':       svg('<circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>'),
+  'style':        svg('<path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72z"/><path d="m14 7 3 3"/>'),
+  'salon':        svg('<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'),
+  'beauty':       svg('<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>'),
+  'makeup':       svg('<circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>'),
+  'nail':         svg('<rect x="8" y="2" width="8" height="14" rx="4"/><path d="M8 14h8"/><path d="M10 20h4"/><path d="M12 16v4"/>'),
+  'spa':          svg('<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>'),
+  'lash':         svg('<path d="M2 12c2-4 5-6 10-6s8 2 10 6"/><path d="M12 6v4"/><path d="M7 7l2 3"/><path d="M17 7l-2 3"/>'),
+  'brow':         svg('<path d="M2 12c2-4 5-6 10-6s8 2 10 6"/><path d="M8 14l4-4 4 4"/>'),
+  'wax':          svg('<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>'),
+  'facial':       svg('<circle cx="12" cy="10" r="6"/><path d="M12 16v6"/><path d="M9 20h6"/><circle cx="10" cy="9" r="1" fill="currentColor"/><circle cx="14" cy="9" r="1" fill="currentColor"/>'),
+  'skin':         svg('<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>'),
+  'massage':      svg('<path d="M4 19V7a4 4 0 0 1 8 0v12"/><path d="M12 7a4 4 0 0 1 8 0v5"/><path d="M4 15h8"/>'),
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // BUSINESS / PROFESSIONAL
+  // ─────────────────────────────────────────────────────────────────────────
+  'strategy':     svg('<path d="M2 20h20"/><path d="M6 20V10l6-8 6 8v10"/><path d="M9 20v-5h6v5"/>'),
+  'plan':         svg('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/>'),
+  'report':       svg('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>'),
+  'manage':       svg('<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/>'),
+  'brand':        svg('<path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>'),
+  'market':       svg('<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>'),
+  'social':       svg('<path d="M17 2H7a5 5 0 0 0-5 5v10a5 5 0 0 0 5 5h10a5 5 0 0 0 5-5V7a5 5 0 0 0-5-5z"/><circle cx="12" cy="12" r="3"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/>'),
+  'seo':          svg('<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="11" y1="8" x2="11" y2="14"/>'),
+  'content':      svg('<path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>'),
+  'email':        svg('<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>'),
+  'advertis':     svg('<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>'),
+  'sales':        svg('<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>'),
+  'growth':       svg('<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>'),
+  'training':     svg('<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>'),
+  'workshop':     svg('<path d="M2 20v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8"/><path d="M4 10V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4"/><path d="M12 4v6"/><path d="M2 18h20"/>'),
+  'coach':        svg('<circle cx="12" cy="8" r="4"/><path d="M4 20v-2a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v2"/>'),
+  'team':         svg('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'),
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // TECHNOLOGY
+  // ─────────────────────────────────────────────────────────────────────────
+  'ai':           svg('<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/>'),
+  'automat':      svg('<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/>'),
+  'data':         svg('<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>'),
+  'analyt':       svg('<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>'),
+  'cloud':        svg('<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>'),
+  'security':     svg('<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>'),
+  'speed':        svg('<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>'),
+  'integrat':     svg('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'),
+  'mobile':       svg('<rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>'),
+  'web':          svg('<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>'),
+  'api':          svg('<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>'),
+  'develop':      svg('<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>'),
+  'support':      svg('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'),
+  'server':       svg('<rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>'),
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FINANCE / LEGAL
+  // ─────────────────────────────────────────────────────────────────────────
+  'finance':      svg('<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'),
+  'account':      svg('<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'),
+  'tax':          svg('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/>'),
+  'invest':       svg('<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>'),
+  'legal':        svg('<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>'),
+  'law':          svg('<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>'),
+  'contract':     svg('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>'),
+  'insurance':    svg('<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/>'),
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // HEALTH / WELLNESS
+  // ─────────────────────────────────────────────────────────────────────────
+  'health':       svg('<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>'),
+  'fitness':      svg('<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>'),
+  'nutrit':       svg('<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>'),
+  'wellbeing':    svg('<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>'),
+  'mental':       svg('<circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/>'),
+  'yoga':         svg('<circle cx="12" cy="5" r="2"/><path d="M12 7v7"/><path d="M7 12l5 2 5-2"/><path d="M9 18l3-2 3 2"/>'),
+  'physio':       svg('<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>'),
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // PROPERTY / CONSTRUCTION
+  // ─────────────────────────────────────────────────────────────────────────
+  'property':     svg('<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>'),
+  'real estate':  svg('<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>'),
+  'design':       svg('<circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>'),
+  'interior':     svg('<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>'),
+  'build':        svg('<polygon points="1 22 23 22 12 2"/><line x1="12" y1="8" x2="12" y2="14"/><line x1="12" y1="18" x2="12.01" y2="18"/>'),
+  'renovate':     svg('<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>'),
+  'landscape':    svg('<path d="M3 15c.5-2 2-3.5 3.5-4.5C8 9.5 10 9 12 9c2 0 4 .5 5.5 1.5C19 11.5 20.5 13 21 15"/><path d="M2 20h20"/><path d="M12 9V3"/><path d="M8 6l4-3 4 3"/>'),
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FOOD / HOSPITALITY
+  // ─────────────────────────────────────────────────────────────────────────
+  'food':         svg('<path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>'),
+  'cater':        svg('<path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>'),
+  'restaurant':   svg('<line x1="9" y1="3" x2="9" y2="21"/><path d="M4 3v6a5 5 0 0 0 10 0V3"/><path d="M20 3v18"/>'),
+  'hospitality':  svg('<path d="M3 9h18v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9z"/><path d="M3 9V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2"/>'),
+  'event':        svg('<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>'),
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // GENERAL FALLBACKS
+  // ─────────────────────────────────────────────────────────────────────────
+  'deliver':      svg('<path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v3"/><rect x="9" y="11" width="14" height="10" rx="1"/><circle cx="12" cy="21" r="1" fill="currentColor"/><circle cx="20" cy="21" r="1" fill="currentColor"/>'),
+  'photo':        svg('<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>'),
+  'video':        svg('<polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>'),
+  'award':        svg('<circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>'),
+  'certif':       svg('<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/>'),
+  'premium':      svg('<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>'),
+  'package':      svg('<path d="M12.89 1.45l8 4A2 2 0 0 1 22 7.24v9.53a2 2 0 0 1-1.11 1.79l-8 4a2 2 0 0 1-1.78 0l-8-4A2 2 0 0 1 2 16.77V7.24a2 2 0 0 1 1.11-1.8l8-4a2 2 0 0 1 1.78.01z"/><polyline points="2.32 6.16 12 11 21.68 6.16"/><line x1="12" y1="22.76" x2="12" y2="11"/>'),
+  'ship':         svg('<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>'),
+  'custom':       svg('<circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41"/><path d="M4.93 4.93l1.41 1.41"/><path d="M19.07 19.07l-1.41-1.41"/><path d="M4.93 19.07l1.41-1.41"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M2 12h2"/><path d="M20 12h2"/>'),
+  'default':      svg('<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>'),
 };
 
 function getIcon(title: string): string {
   const lower = title.toLowerCase();
-  for (const [key, icon] of Object.entries(FEATURE_ICONS)) {
-    if (lower.includes(key)) return icon;
+  // Longest-match first — compound keywords (haircut, coloring, styling…)
+  // beat generic fallbacks (hair, color, style…) automatically.
+  const sortedKeys = Object.keys(FEATURE_ICONS).sort((a, b) => b.length - a.length);
+  for (const key of sortedKeys) {
+    if (key !== 'default' && lower.includes(key)) return FEATURE_ICONS[key];
   }
   return FEATURE_ICONS.default;
 }
+
 
 function renderSection(section: AeoSection, entityMap: EntityMap, index: number): string {
   const isHero    = section.type === 'hero';
@@ -684,7 +851,7 @@ function renderSection(section: AeoSection, entityMap: EntityMap, index: number)
       ? `<p class="hero-sub fade-in fade-in-2">${section.body}</p>`
       : '';
     return `
-<section class="hero-section" aria-label="Hero">
+<section class="hero-section" aria-label="Hero" data-section="hero">
   <div class="container">
     <div class="hero-section__inner">
       <div class="hero-badge fade-in fade-in-1">${entityMap.industry}</div>
@@ -708,7 +875,7 @@ function renderSection(section: AeoSection, entityMap: EntityMap, index: number)
       ? `<p>${section.body}</p>`
       : '';
     return `
-<section class="cta-section" id="contact" aria-labelledby="cta-heading">
+<section class="cta-section" id="contact" aria-labelledby="cta-heading" data-section="cta">
   <div class="container">
     <div class="cta-section__inner">
       <div>
@@ -743,7 +910,7 @@ function renderSection(section: AeoSection, entityMap: EntityMap, index: number)
     }).join('\n');
 
     return `
-<section id="faq" aria-labelledby="faq-heading">
+<section id="faq" aria-labelledby="faq-heading" data-section="faq">
   <div class="container">
     <span class="section-eyebrow">FAQ</span>
     <${section.headingLevel} id="faq-heading">${section.heading}</${section.headingLevel}>
@@ -772,7 +939,7 @@ function renderSection(section: AeoSection, entityMap: EntityMap, index: number)
 
     const sectionId = section.type === 'services' ? 'services' : 'features';
     return `
-<section id="${sectionId}" aria-labelledby="${sectionId}-heading">
+<section id="${sectionId}" aria-labelledby="${sectionId}-heading" data-section="${sectionId}">
   <div class="container">
     <span class="section-eyebrow">${section.type === 'services' ? 'Our Services' : 'Features'}</span>
     <${section.headingLevel} id="${sectionId}-heading" style="max-width:28ch">${section.heading}</${section.headingLevel}>
@@ -790,7 +957,7 @@ function renderSection(section: AeoSection, entityMap: EntityMap, index: number)
       ? `<ul class="checklist">${section.listItems.map(i => `<li>${i}</li>`).join('')}</ul>`
       : '';
     return `
-<section id="about" aria-labelledby="about-heading">
+<section id="about" aria-labelledby="about-heading" data-section="about">
   <div class="container">
     <div class="about-section__inner">
       <div>
@@ -824,7 +991,7 @@ function renderSection(section: AeoSection, entityMap: EntityMap, index: number)
     }).join('\n');
 
     return `
-<section id="testimonials" aria-labelledby="testimonials-heading">
+<section id="testimonials" aria-labelledby="testimonials-heading" data-section="testimonials">
   <div class="container">
     <span class="section-eyebrow">Testimonials</span>
     <${section.headingLevel} id="testimonials-heading">${section.heading}</${section.headingLevel}>
@@ -853,14 +1020,244 @@ function renderSection(section: AeoSection, entityMap: EntityMap, index: number)
 </section>`.trim();
 }
 
+// ── Option 3: Nav variant CSS ──────────────────────────────────────────────────
+
+function stackedNavCss(): string {
+  return `
+    /* ─── Stacked Display Nav ───────────────────────────────────── */
+    .site-nav {
+      position: static;
+      background: var(--c-surface);
+      border-bottom: 1px solid var(--c-border);
+      padding: 1.5rem 0 0;
+    }
+    .site-nav__inner {
+      display: block;
+      padding-block: 0;
+    }
+    .site-nav__top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding-bottom: 1rem;
+    }
+    .site-nav__brand {
+      font-family: var(--f-heading);
+      font-weight: 800;
+      font-size: 1rem;
+      color: var(--c-text);
+      text-decoration: none;
+      letter-spacing: -0.02em;
+    }
+    .site-nav__phone {
+      font-family: var(--f-body);
+      font-size: 0.875rem;
+      color: var(--c-text);
+      text-decoration: none;
+      opacity: 0.7;
+    }
+    .site-nav__links {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 0;
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      border-top: 1px solid var(--c-border);
+      padding-top: 0.75rem;
+      padding-bottom: 1.25rem;
+    }
+    .site-nav__links li { display: inline; }
+    .site-nav__links a {
+      font-family: var(--f-heading);
+      font-size: clamp(1.75rem, 4.5vw, 3.25rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      text-decoration: none;
+      color: var(--c-text);
+      margin-right: 0.6em;
+      transition: opacity 150ms;
+    }
+    .site-nav__links a:hover { opacity: 0.5; }
+    .site-nav__cta { display: none; }
+  `;
+}
+
+function minimalNavCss(): string {
+  return `
+    /* ─── Minimal Nav ───────────────────────────────────────────── */
+    .site-nav {
+      position: sticky; top: 0; z-index: 100;
+      background: var(--c-surface);
+      padding: 0;
+    }
+    .site-nav__inner {
+      display: flex; align-items: center;
+      justify-content: space-between;
+      padding-block: 1.25rem;
+    }
+    .site-nav__brand {
+      font-family: var(--f-heading);
+      font-weight: 800;
+      font-size: 1.1rem;
+      color: var(--c-text);
+      text-decoration: none;
+    }
+    .site-nav__links { display: none; }
+  `;
+}
+
+// ── Option 4: Brand-First HTML Skeleton ────────────────────────────────────────
+
+/**
+ * Injects AEO content into the original HTML skeleton:
+ * - Replaces <title> and <meta name="description">
+ * - Injects JSON-LD blocks into <head>
+ * - Injects an AEO summary panel just after <body>
+ * - Appends ALIAS attribution comment
+ */
+function buildHtmlFromSkeleton(
+  originalHtml: string,
+  aeoContent: AeoContent,
+  originalUrl: string,
+  fetchedStylesheets: string[] = [],
+  geminiLayoutCss: string = ""
+): string {
+  let html = originalHtml;
+
+  // 0. Inject <base href> so relative CSS/image/font paths resolve against
+  //    the original domain, not our localhost preview server.
+  const origin = (() => {
+    try { return new URL(originalUrl).origin + '/'; } catch { return ''; }
+  })();
+  if (origin && !/<base[\s]/i.test(html)) {
+    html = html.replace(/(<head[^>]*>)/i, (m) => m + '\n  <base href="' + origin + '">');
+  }
+
+  // 1. Replace <title>
+  html = html.replace(/<title>[^<]*<\/title>/i, `<title>${escHtml(aeoContent.title)}</title>`);
+
+  // 2. Replace or inject <meta name="description">
+  const descTag = `<meta name="description" content="${escHtml(aeoContent.metaDescription)}">`;
+  if (/<meta\s+name=["']description["']/i.test(html)) {
+    html = html.replace(/<meta\s+name=["']description["'][^>]*>/i, descTag);
+  } else {
+    html = html.replace('</head>', `  ${descTag}\n</head>`);
+  }
+
+  // 3a. Option C — inject real fetched stylesheets first (original selectors preserved)
+  if (fetchedStylesheets.length > 0) {
+    const realCssBlock = fetchedStylesheets
+      .map(css => '<style>\n/* ALIAS: real stylesheet (Option C) */\n' + css + '\n</style>')
+      .join('\n');
+    html = html.replace('</head>', realCssBlock + '\n</head>');
+  }
+
+  // 3b. Option A — Gemini screenshot-driven layout CSS as an override layer
+  //     Comes after real CSS so it can fill gaps from JS-injected / missing styles.
+  if (geminiLayoutCss.trim()) {
+    const cleanCss = geminiLayoutCss
+      .replace(/^```css\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+    const geminiBlock =
+      '<style id="alias-layout-override">\n/* ALIAS: screenshot-driven layout (Option A) */\n' +
+      cleanCss + '\n</style>';
+    html = html.replace('</head>', geminiBlock + '\n</head>');
+  }
+
+  // 3c. Inject JSON-LD + attribution
+  const jsonLdBlocks = aeoContent.jsonLd.map(schema =>
+    `<script type="application/ld+json">\n${JSON.stringify(schema, null, 2)}\n</script>`
+  ).join('\n');
+  html = html.replace('</head>', `${jsonLdBlocks}\n  <!-- Rebuilt by ALIAS COMPILER — AEO Optimised | Source: ${originalUrl} -->\n</head>`);
+
+  // 4. Inject an AEO answer capsule right after <body>
+  const capsule = `
+<!-- ALIAS COMPILER: AEO Answer Capsule -->
+<div id="alias-aeo-capsule" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;" aria-hidden="true">
+  <h1>${escHtml(aeoContent.h1)}</h1>
+  <p>${escHtml(aeoContent.sections[0]?.body || aeoContent.metaDescription)}</p>
+</div>`;
+  html = html.replace(/<body[^>]*>/i, (match) => `${match}\n${capsule}`);
+
+  return html;
+}
+
+function escHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ── Font link injection helper (Option 1) ─────────────────────────────────────
+
+function buildFontTags(detectedFontLinks: string[]): string {
+  if (detectedFontLinks.length === 0) return '';
+  // Deduplicate and emit <link> tags, adding preconnect for known font CDNs
+  const preconnects = new Set<string>();
+  const links: string[] = [];
+
+  for (const href of detectedFontLinks) {
+    if (href.includes('googleapis.com') || href.includes('gstatic.com')) {
+      preconnects.add('https://fonts.googleapis.com');
+      preconnects.add('https://fonts.gstatic.com');
+    } else if (href.includes('typekit.net')) {
+      preconnects.add('https://use.typekit.net');
+    } else if (href.includes('bunny.net')) {
+      preconnects.add('https://fonts.bunny.net');
+    }
+    links.push(`  <link rel="stylesheet" href="${href}">`);
+  }
+
+  const preConnectTags = [...preconnects].map(origin =>
+    `  <link rel="preconnect" href="${origin}" crossorigin>`
+  ).join('\n');
+
+  return `${preConnectTags}\n${links.join('\n')}`;
+}
+
+// ── Main entry point ──────────────────────────────────────────────────────────
+
+export interface BuildOptions {
+  detectedFontLinks?: string[];  // Option 1: inject real font <link> tags
+  fidelityMode?: 'aeo-first' | 'brand-first';  // Option 5
+  originalHtml?: string;         // Option 4: skeleton source
+  fetchedStylesheets?: string[]; // Option C: raw CSS fetched from same-origin stylesheets
+  geminiLayoutCss?: string;      // Option A: CSS generated from screenshot by Gemini
+  /** Brand DNA — when present, drives semantic CSS tokens (60-30-10 palette) */
+  brandDna?: BrandDNA;
+}
+
 export function buildHtml(
   tokens: DesignTokens,
   aeoContent: AeoContent,
   entityMap: EntityMap,
-  originalUrl: string
+  originalUrl: string,
+  options: BuildOptions = {}
 ): string {
-  const css = cssFromTokens(tokens);
-  const fontsHref = googleFontsLink(tokens);
+  const { detectedFontLinks = [], fidelityMode = 'aeo-first', originalHtml,
+          fetchedStylesheets = [], geminiLayoutCss = '', brandDna } = options;
+
+  // ── Option 4: Brand-First — use original HTML as skeleton ──────────────────
+  if (fidelityMode === 'brand-first' && originalHtml && originalHtml.length > 500) {
+    return buildHtmlFromSkeleton(originalHtml, aeoContent, originalUrl, fetchedStylesheets, geminiLayoutCss);
+  }
+
+  // ── AEO-First: generate from design tokens ─────────────────────────────────
+  const navStyle = tokens.layout.navStyle || 'horizontal';
+
+  // Option 1: Use real detected font links if available, else fall back to Google Fonts construction
+  const fontTags = detectedFontLinks.length > 0
+    ? buildFontTags(detectedFontLinks)
+    : `  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="${googleFontsLink(tokens)}" rel="stylesheet">`;
+
+  // Option 3: Extra CSS for stacked/minimal nav variants
+  let navVariantCss = '';
+  if (navStyle === 'stacked-display') navVariantCss = stackedNavCss();
+  else if (navStyle === 'minimal') navVariantCss = minimalNavCss();
+
+  const css = cssFromTokens(tokens, brandDna) + navVariantCss;
 
   const jsonLdBlocks = aeoContent.jsonLd.map(schema =>
     `  <script type="application/ld+json">\n${JSON.stringify(schema, null, 2)}\n  </script>`
@@ -868,51 +1265,37 @@ export function buildHtml(
 
   const navLinks = aeoContent.sections
     .filter(s => ['features', 'services', 'about', 'faq', 'testimonials'].includes(s.type))
-    .slice(0, 4)
-    .map(s => {
-      const id = s.type;
-      const label = s.heading.split(' ').slice(0, 3).join(' ');
-      return `<li><a href="#${id}">${label}</a></li>`;
-    })
+    .slice(0, 5)
+    .map(s => `<li><a href="#${s.type}">${s.heading.split(' ').slice(0, 3).join(' ')}</a></li>`)
     .join('');
 
-  const sections = aeoContent.sections
-    .map((s, i) => renderSection(s, entityMap, i))
-    .join('\n\n');
-
-  const year = new Date().getFullYear();
-  const industry = entityMap.industry;
-  const entities = entityMap.entities.slice(0, 5);
-
-  // Footer column 2: entity tags as nav links
-  const entityLinks = entities
-    .map(e => `<li><a href="#">${e}</a></li>`)
-    .join('');
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${aeoContent.title}</title>
-  <meta name="description" content="${aeoContent.metaDescription}">
-  <meta name="robots" content="index, follow">
-  <meta property="og:title" content="${aeoContent.title}">
-  <meta property="og:description" content="${aeoContent.metaDescription}">
-  <meta property="og:type" content="website">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="${fontsHref}" rel="stylesheet">
-${jsonLdBlocks}
-  <!-- Rebuilt by ALIAS COMPILER — AEO Optimised | Source: ${originalUrl} -->
-  <style>
-${css}
-  </style>
-</head>
-<body>
-
-  <!-- Navigation -->
-  <header>
+  // Option 3: Render nav HTML based on navStyle
+  const navHtml = navStyle === 'stacked-display'
+    ? `  <header>
+    <nav class="site-nav" id="site-nav" role="navigation" aria-label="Main navigation">
+      <div class="container">
+        <div class="site-nav__inner">
+          <div class="site-nav__top">
+            <a href="#" class="site-nav__brand">${entityMap.businessName}</a>
+          </div>
+          <ul class="site-nav__links" role="list">
+            ${navLinks}
+          </ul>
+        </div>
+      </div>
+    </nav>
+  </header>`
+    : navStyle === 'minimal'
+    ? `  <header>
+    <nav class="site-nav" id="site-nav" role="navigation" aria-label="Main navigation">
+      <div class="container">
+        <div class="site-nav__inner">
+          <a href="#" class="site-nav__brand">${entityMap.businessName}</a>
+        </div>
+      </div>
+    </nav>
+  </header>`
+    : `  <header>
     <nav class="site-nav" id="site-nav" role="navigation" aria-label="Main navigation">
       <div class="container">
         <div class="site-nav__inner">
@@ -926,7 +1309,37 @@ ${css}
         </div>
       </div>
     </nav>
-  </header>
+  </header>`;
+
+  const sections = aeoContent.sections
+    .map((s, i) => renderSection(s, entityMap, i))
+    .join('\n\n');
+
+  const year = new Date().getFullYear();
+  const entities = entityMap.entities.slice(0, 5);
+  const entityLinks = entities.map(e => `<li><a href="#">${e}</a></li>`).join('');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${aeoContent.title}</title>
+  <meta name="description" content="${aeoContent.metaDescription}">
+  <meta name="robots" content="index, follow">
+  <meta property="og:title" content="${aeoContent.title}">
+  <meta property="og:description" content="${aeoContent.metaDescription}">
+  <meta property="og:type" content="website">
+${fontTags}
+${jsonLdBlocks}
+  <!-- Rebuilt by ALIAS COMPILER — AEO Optimised | Mode: ${fidelityMode} | Source: ${originalUrl} -->
+  <style>
+${css}
+  </style>
+</head>
+<body>
+
+${navHtml}
 
   <!-- Main content -->
   <main id="main-content">
@@ -950,7 +1363,7 @@ ${css}
         <div>
           <p class="site-footer__col-title">Industry</p>
           <ul class="site-footer__links" role="list">
-            <li><a href="#">${industry}</a></li>
+            <li><a href="#">${entityMap.industry}</a></li>
             <li><a href="#">${entityMap.primaryService}</a></li>
             <li><a href="#">Contact Us</a></li>
           </ul>
@@ -967,7 +1380,6 @@ ${css}
   </footer>
 
   <script>
-    // Sticky nav shadow on scroll
     var nav = document.getElementById('site-nav');
     if (nav) {
       window.addEventListener('scroll', function() {
@@ -979,3 +1391,4 @@ ${css}
 </body>
 </html>`;
 }
+
