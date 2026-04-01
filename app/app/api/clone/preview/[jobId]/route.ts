@@ -6,6 +6,9 @@ type RouteContext = { params: Promise<{ jobId: string }> };
 const PREVIEW_HEADERS = {
   'X-Frame-Options': 'SAMEORIGIN',
   'Content-Security-Policy': "default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com data: 'unsafe-inline'; img-src * data: blob:;",
+  // Never cache — content changes after every refine/apply
+  'Cache-Control': 'no-store, no-cache, must-revalidate',
+  'Pragma': 'no-cache',
 };
 
 export async function HEAD(_req: NextRequest, ctx: RouteContext) {

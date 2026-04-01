@@ -47,5 +47,12 @@ export async function GET(_req: NextRequest, ctx: RouteContext) {
         score: job.phases.audit.score,
       },
     },
+
+    // Site structure plan (tactical grid)
+    sitePlan: job.sitePlan ?? null,
+
+    // AI Strategist report
+    strategistReport: job.strategistReport ?? null,
   });
 }
+

@@ -1,22 +1,151 @@
 import { AeoContent, AeoSection, BrandDNA, DesignTokens, EntityMap } from './types';
 import { brandDnaToCssTokens } from './brand-dna';
 
+// ── Text sanitisation ─────────────────────────────────────────────────────────
+
+/**
+ * Strip common markdown tokens from a Gemini-generated string so they don't
+ * appear as literal characters in the rendered HTML.
+ *
+ * Handles: **bold**, *italic*, __underline__, _italic_, `code`,
+ *          # headings (leading hashes), [link text](url), > blockquotes
+ */
+export function stripMarkdown(text: string): string {
+  if (!text) return text;
+  return text
+    // fenced code blocks first (multi-line safe since we operate on single strings)
+    .replace(/```[\s\S]*?```/g, '')
+    // inline code
+    .replace(/`[^`]*`/g, (m) => m.slice(1, -1))
+    // bold+italic  ***text***
+    .replace(/\*{3}([^*]+)\*{3}/g, '$1')
+    // bold **text** or __text__
+    .replace(/(\*\*|__)(.*?)\1/g, '$2')
+    // italic *text* or _text_  (not inside words — avoid breaking URLs)
+    .replace(/(?<!\w)(\*|_)(?!\s)(.+?)(?<!\s)\1(?!\w)/g, '$2')
+    // headings: leading hashes
+    .replace(/^#{1,6}\s+/gm, '')
+    // blockquotes
+    .replace(/^>\s*/gm, '')
+    // markdown links [text](url) → text
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    // markdown images ![alt](url) → ''
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, '')
+    // horizontal rules
+    .replace(/^[-*_]{3,}\s*$/gm, '')
+    // collapse multiple blank lines created by removals
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+// ── WCAG contrast utilities ──────────────────────────────────────────────────
+
+/** Expand a 3-digit hex to 6-digit. Returns null if unparseable. */
+function parseHex(hex: string): [number, number, number] | null {
+  const s = hex.replace('#', '').trim();
+  if (s.length === 3) {
+    const [r, g, b] = s.split('').map(c => parseInt(c + c, 16));
+    return [r, g, b];
+  }
+  if (s.length === 6) {
+    return [
+      parseInt(s.slice(0, 2), 16),
+      parseInt(s.slice(2, 4), 16),
+      parseInt(s.slice(4, 6), 16),
+    ];
+  }
+  return null;
+}
+
+function toHex(r: number, g: number, b: number): string {
+  return '#' + [r, g, b].map(v => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, '0')).join('');
+}
+
+/** WCAG relative luminance (0–1) */
+function luminance(r: number, g: number, b: number): number {
+  const lin = (c: number) => {
+    const s = c / 255;
+    return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+/** WCAG contrast ratio between two colours (≥4.5 = AA, ≥7 = AAA) */
+function contrastRatio(hex1: string, hex2: string): number {
+  const c1 = parseHex(hex1);
+  const c2 = parseHex(hex2);
+  if (!c1 || !c2) return 1;
+  const l1 = luminance(...c1);
+  const l2 = luminance(...c2);
+  const lighter = Math.max(l1, l2);
+  const darker  = Math.min(l1, l2);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+/**
+ * Given a foreground and background hex, return a foreground colour that
+ * meets WCAG AA (4.5:1) for normal text. Pushes the fg toward black or white
+ * in steps until the threshold is met or 60 iterations are exhausted.
+ *
+ * If the original colours are not parseable (e.g. CSS variables), returns fg unchanged.
+ */
+function ensureContrast(fg: string, bg: string, minRatio = 4.5): string {
+  const bgParsed = parseHex(bg);
+  const fgParsed = parseHex(fg);
+  if (!bgParsed || !fgParsed) return fg;
+
+  // Already passes — return as-is
+  if (contrastRatio(fg, bg) >= minRatio) return fg;
+
+  const bgLum = luminance(...bgParsed);
+  // Push toward white if background is dark, toward black if background is light
+  const target: [number, number, number] = bgLum < 0.5 ? [255, 255, 255] : [0, 0, 0];
+
+  let [r, g, b] = fgParsed;
+  for (let i = 0; i < 60; i++) {
+    r += (target[0] - r) * 0.12;
+    g += (target[1] - g) * 0.12;
+    b += (target[2] - b) * 0.12;
+    if (contrastRatio(toHex(r, g, b), bg) >= minRatio) break;
+  }
+  return toHex(r, g, b);
+}
+
+
 function cssFromTokens(tokens: DesignTokens, brandDna?: BrandDNA): string {
   const { typography, spacing } = tokens;
 
-  // When Brand DNA is available, its semantic tokens override the raw hex values.
-  // The functional --c-* aliases inside brandDnaToCssTokens reference var(--color-brand-*)
-  // so everything cascades from one source of truth.
+  // ── WCAG AA contrast enforcement ──────────────────────────────────────────
+  // All foreground colours are corrected against their expected background
+  // before being emitted as CSS variables. Any pair that falls below 4.5:1
+  // is nudged toward black/white until it passes.
   const colorBlock = brandDna
-    ? brandDnaToCssTokens(brandDna)
-    : `
-  --c-primary:   ${tokens.colors.primary};
-  --c-secondary: ${tokens.colors.secondary};
-  --c-surface:   ${tokens.colors.surface};
-  --c-text:      ${tokens.colors.text};
-  --c-accent:    ${tokens.colors.accent};
+    ? (() => {
+        const p = brandDna.palette;
+        // Correct text on dominant surface
+        const safeText      = ensureContrast(p.text,      p.dominant,   4.5);
+        const safeMuted     = ensureContrast(p.textMuted, p.dominant,   3.0); // large text threshold
+        // Correct supporting text on supporting background
+        const safeTextOnSup = ensureContrast(p.text,      p.supporting, 4.5);
+        // Use the stricter of the two
+        const finalText     = contrastRatio(safeText, p.dominant) >= 4.5 ? safeText : safeTextOnSup;
+        const patchedDna = { ...brandDna, palette: { ...p, text: finalText, textMuted: safeMuted } };
+        return brandDnaToCssTokens(patchedDna);
+      })()
+    : (() => {
+        const { primary, secondary, surface, text, accent } = tokens.colors;
+        const safeText   = ensureContrast(text,    surface,   4.5);
+        const safeMuted  = ensureContrast(text,    surface,   3.0);
+        const safeAccent = ensureContrast(accent,  surface,   3.0); // accent used at large sizes
+        return `
+  --c-primary:   ${primary};
+  --c-secondary: ${secondary};
+  --c-surface:   ${surface};
+  --c-text:      ${safeText};
+  --c-accent:    ${safeAccent};
   --c-border:    ${tokens.colors.border || 'rgba(0,0,0,0.08)'};
-  --c-muted:     color-mix(in srgb, ${tokens.colors.text} 60%, ${tokens.colors.surface});`.trimStart();
+  --c-muted:     ${safeMuted};`.trimStart();
+      })();
 
   return `
     /* ─── Design Tokens ─────────────────────────────────────────── */
@@ -79,7 +208,7 @@ function cssFromTokens(tokens: DesignTokens, brandDna?: BrandDNA): string {
     ul, ol { padding-left: 1.5rem; margin-bottom: 1rem; }
     li { margin-bottom: 0.5rem; line-height: 1.6; }
     strong { font-weight: 600; }
-    blockquote { border-left: 3px solid var(--c-primary); padding: 0.75rem 1.25rem; margin: 1.5rem 0; opacity: 0.85; font-style: italic; }
+    blockquote { border: 1px solid color-mix(in srgb, var(--c-primary) 30%, transparent); border-radius: var(--radius-md); padding: 0.75rem 1.25rem; margin: 1.5rem 0; opacity: 0.85; font-style: italic; }
 
     /* ─── Layout ────────────────────────────────────────────────── */
     .container {
@@ -120,7 +249,7 @@ function cssFromTokens(tokens: DesignTokens, brandDna?: BrandDNA): string {
     .site-nav__links {
       display: flex;
       align-items: center;
-      gap: 2rem;
+      gap: 0.5rem;
       list-style: none;
       padding: 0;
       margin: 0;
@@ -128,12 +257,21 @@ function cssFromTokens(tokens: DesignTokens, brandDna?: BrandDNA): string {
     .site-nav__links a {
       text-decoration: none;
       color: var(--c-text);
-      font-size: 0.9rem;
+      font-size: 0.85rem;
       font-weight: 500;
-      opacity: 0.7;
-      transition: opacity var(--transition);
+      padding: 0.35rem 0.9rem;
+      border-radius: var(--radius-pill);
+      border: 1px solid color-mix(in srgb, var(--c-border) 80%, transparent);
+      background: transparent;
+      opacity: 0.75;
+      transition: opacity var(--transition), background var(--transition), border-color var(--transition);
+      white-space: nowrap;
     }
-    .site-nav__links a:hover { opacity: 1; }
+    .site-nav__links a:hover {
+      opacity: 1;
+      background: color-mix(in srgb, var(--c-primary) 6%, transparent);
+      border-color: color-mix(in srgb, var(--c-primary) 40%, transparent);
+    }
     .site-nav__cta {
       display: inline-flex;
       align-items: center;
@@ -177,28 +315,7 @@ function cssFromTokens(tokens: DesignTokens, brandDna?: BrandDNA): string {
       gap: 2rem;
       max-width: 52rem;
     }
-    .hero-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      background: color-mix(in srgb, var(--c-primary) 10%, transparent);
-      border: 1px solid color-mix(in srgb, var(--c-primary) 25%, transparent);
-      color: var(--c-primary);
-      padding: 0.35rem 0.9rem;
-      border-radius: var(--radius-pill);
-      font-size: 0.78rem;
-      font-weight: 600;
-      letter-spacing: 0.03em;
-      width: fit-content;
-    }
-    .hero-badge::before {
-      content: '';
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: currentColor;
-      flex-shrink: 0;
-    }
+    .hero-badge { display: none; }
     .hero-section h1 {
       font-size: clamp(2.5rem, 6vw, 4.5rem);
       line-height: 1.07;
@@ -226,7 +343,6 @@ function cssFromTokens(tokens: DesignTokens, brandDna?: BrandDNA): string {
     .answer-capsule {
       background: color-mix(in srgb, var(--c-primary) 6%, var(--c-surface));
       border: 1px solid color-mix(in srgb, var(--c-primary) 18%, transparent);
-      border-left: 4px solid var(--c-primary);
       border-radius: var(--radius-md);
       padding: 1.25rem 1.5rem;
       margin-bottom: 1.5rem;
@@ -645,6 +761,129 @@ function cssFromTokens(tokens: DesignTokens, brandDna?: BrandDNA): string {
   `.trim();
 }
 
+// ── Monochrome override ───────────────────────────────────────────────────────
+/**
+ * Returns a :root override block that forces all colour CSS variables into a
+ * clean, WCAG-AA-compliant grayscale palette. Appended after the brand token
+ * block so it wins the cascade without touching HTML.
+ *
+ * Palette rationale:
+ *  surface  #ffffff  — pure white; maximum readability base
+ *  text     #111111  — ~18:1 on white; AAA for all text sizes
+ *  primary  #1a1a1a  — used for brand name, nav brand, CTA backgrounds
+ *  secondary #555555 — supporting text; ≥ 7:1 on white (AA for small text)
+ *  accent   #333333  — icon/accent tint; ≥ 12:1 on white
+ *  muted    #6b6b6b  — muted labels; ≥ 4.6:1 on white (AA)
+ *  border   rgba(0,0,0,0.14) — subtle dividers without heavy lines
+ */
+function monochromeOverrideCss(): string {
+  return `
+    /* ─── Monochrome Accessibility Override ─────────────────────── */
+    :root {
+      --c-primary:   #1a1a1a;
+      --c-secondary: #555555;
+      --c-surface:   #ffffff;
+      --c-text:      #111111;
+      --c-accent:    #333333;
+      --c-border:    rgba(0,0,0,0.14);
+      --c-muted:     #6b6b6b;
+
+      /* Supporting semantic aliases used by brand-dna token blocks */
+      --c-dominant:   #ffffff;
+      --c-supporting: #f4f4f4;
+
+      /* Shadows become neutral grey instead of colour-tinted */
+      --shadow-sm:  0 1px 3px rgba(0,0,0,0.10), 0 1px 2px rgba(0,0,0,0.06);
+      --shadow-md:  0 4px 16px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06);
+      --shadow-lg:  0 12px 40px rgba(0,0,0,0.16), 0 4px 12px rgba(0,0,0,0.08);
+    }
+
+    /* Ensure hero gradient stays neutral */
+    .hero-section::before {
+      background: linear-gradient(135deg,
+        rgba(0,0,0,0.04) 0%,
+        rgba(0,0,0,0.02) 50%,
+        transparent 100%
+      ) !important;
+    }
+
+    /* CTA section stays readable: dark bg + white text */
+    .cta-section {
+      background: #1a1a1a !important;
+    }
+    .cta-section h2,
+    .cta-section p { color: #f5f5f5 !important; }
+    .cta-section .btn-ghost {
+      background: rgba(255,255,255,0.12) !important;
+      border-color: rgba(255,255,255,0.28) !important;
+      color: #ffffff !important;
+    }
+
+    /* Feature/stat card tints neutralised */
+    .feature-card__icon {
+      background: rgba(0,0,0,0.06) !important;
+      border-color: rgba(0,0,0,0.10) !important;
+      color: #1a1a1a !important;
+    }
+    .stat-item {
+      background: rgba(0,0,0,0.04) !important;
+      border-color: rgba(0,0,0,0.10) !important;
+    }
+    .stat-item__number { color: #1a1a1a !important; }
+
+    /* Answer capsule */
+    .answer-capsule {
+      background: rgba(0,0,0,0.04) !important;
+      border-color: rgba(0,0,0,0.12) !important;
+    }
+
+    /* Testimonial quote mark */
+    .testimonial-card::before { color: #1a1a1a !important; opacity: 0.10 !important; }
+    .testimonial-card__author { color: #1a1a1a !important; }
+
+    /* FAQ */
+    .faq-item summary {
+      color: #1a1a1a !important;
+    }
+    .faq-item summary:hover,
+    .faq-item details[open] summary {
+      background: rgba(0,0,0,0.04) !important;
+    }
+
+    /* Section eyebrow */
+    .section-eyebrow { color: #333333 !important; }
+
+    /* Checklist ticks */
+    .checklist li::before { color: #1a1a1a !important; }
+
+    /* Nav CTA button */
+    .site-nav__cta {
+      background: #1a1a1a !important;
+      color: #ffffff !important;
+    }
+    .site-nav__links a:hover {
+      background: rgba(0,0,0,0.06) !important;
+      border-color: rgba(0,0,0,0.20) !important;
+    }
+
+    /* Primary buttons */
+    .btn-primary {
+      background: #1a1a1a !important;
+      color: #ffffff !important;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25) !important;
+    }
+    .btn-outline {
+      color: #1a1a1a !important;
+      border-color: #1a1a1a !important;
+    }
+
+    /* Footer */
+    .site-footer {
+      background: #111111 !important;
+    }
+  `.trim();
+}
+
 function googleFontsLink(tokens: DesignTokens): string {
   const fonts = [tokens.typography.headingFont, tokens.typography.bodyFont]
     .filter((f, i, a) => a.indexOf(f) === i && f.trim().length > 0)
@@ -832,6 +1071,16 @@ function getIcon(title: string): string {
 
 
 function renderSection(section: AeoSection, entityMap: EntityMap, index: number): string {
+  // ── Sanitise all AI-generated strings before any HTML rendering ─────────────
+  // Gemini occasionally leaks markdown syntax (**bold**, *italic*, **, etc.)
+  // into its JSON output. Strip it here so it never reaches the DOM.
+  section = {
+    ...section,
+    heading:   stripMarkdown(section.heading   ?? ''),
+    body:      stripMarkdown(section.body       ?? ''),
+    listItems: section.listItems?.map(item => stripMarkdown(item)) ?? [],
+  };
+
   const isHero    = section.type === 'hero';
   const isCta     = section.type === 'cta';
   const isFaq     = section.type === 'faq';
@@ -840,6 +1089,7 @@ function renderSection(section: AeoSection, entityMap: EntityMap, index: number)
   const isTestimonials = section.type === 'testimonials';
   const isFirst   = index === 0;
   const delay     = Math.min(index, 4);
+
 
   // ── Hero ──────────────────────────────────────────────────────────────────
   if (isHero) {
@@ -854,7 +1104,7 @@ function renderSection(section: AeoSection, entityMap: EntityMap, index: number)
 <section class="hero-section" aria-label="Hero" data-section="hero">
   <div class="container">
     <div class="hero-section__inner">
-      <div class="hero-badge fade-in fade-in-1">${entityMap.industry}</div>
+
       <h1 class="fade-in fade-in-2">${line1}${line2 ? ` <em>${line2}</em>` : ''}</h1>
       ${bodyHtml}
       ${section.isList && section.listItems?.length
@@ -1225,6 +1475,15 @@ export interface BuildOptions {
   geminiLayoutCss?: string;      // Option A: CSS generated from screenshot by Gemini
   /** Brand DNA — when present, drives semantic CSS tokens (60-30-10 palette) */
   brandDna?: BrandDNA;
+  /** All pages in this site — used to generate cross-page navigation */
+  sitePages?: { slug: string; title: string }[];
+  /**
+   * Apply a monochrome (grayscale) CSS override layer for maximum accessibility.
+   * Defaults to true — all colour tokens are replaced with a WCAG-AA-compliant
+   * grayscale palette so previews are always readable regardless of brand colours.
+   * Set to false to render the brand's original extracted palette.
+   */
+  monochrome?: boolean;
 }
 
 export function buildHtml(
@@ -1235,15 +1494,27 @@ export function buildHtml(
   options: BuildOptions = {}
 ): string {
   const { detectedFontLinks = [], fidelityMode = 'aeo-first', originalHtml,
-          fetchedStylesheets = [], geminiLayoutCss = '', brandDna } = options;
+          fetchedStylesheets = [], geminiLayoutCss = '', brandDna, sitePages = [],
+          monochrome = true } = options;
+
+  // ── Sanitise top-level AEO content fields ───────────────────────────────────
+  aeoContent = {
+    ...aeoContent,
+    title:           stripMarkdown(aeoContent.title           ?? ''),
+    metaDescription: stripMarkdown(aeoContent.metaDescription ?? ''),
+    h1:              stripMarkdown(aeoContent.h1              ?? ''),
+  };
 
   // ── Option 4: Brand-First — use original HTML as skeleton ──────────────────
+
   if (fidelityMode === 'brand-first' && originalHtml && originalHtml.length > 500) {
     return buildHtmlFromSkeleton(originalHtml, aeoContent, originalUrl, fetchedStylesheets, geminiLayoutCss);
   }
 
   // ── AEO-First: generate from design tokens ─────────────────────────────────
-  const navStyle = tokens.layout.navStyle || 'horizontal';
+  // Multi-page sites always use horizontal nav — stacked-display renders items at
+  // heading scale and looks decorative rather than functional.
+  const navStyle = sitePages.length > 1 ? 'horizontal' : (tokens.layout.navStyle || 'horizontal');
 
   // Option 1: Use real detected font links if available, else fall back to Google Fonts construction
   const fontTags = detectedFontLinks.length > 0
@@ -1257,17 +1528,103 @@ export function buildHtml(
   if (navStyle === 'stacked-display') navVariantCss = stackedNavCss();
   else if (navStyle === 'minimal') navVariantCss = minimalNavCss();
 
-  const css = cssFromTokens(tokens, brandDna) + navVariantCss;
+  const css = cssFromTokens(tokens, brandDna) + navVariantCss
+    + (monochrome ? '\n\n    ' + monochromeOverrideCss() : '');
 
   const jsonLdBlocks = aeoContent.jsonLd.map(schema =>
     `  <script type="application/ld+json">\n${JSON.stringify(schema, null, 2)}\n  </script>`
   ).join('\n');
 
-  const navLinks = aeoContent.sections
-    .filter(s => ['features', 'services', 'about', 'faq', 'testimonials'].includes(s.type))
-    .slice(0, 5)
-    .map(s => `<li><a href="#${s.type}">${s.heading.split(' ').slice(0, 3).join(' ')}</a></li>`)
-    .join('');
+  // Map section types to clean, conventional nav labels.
+  // Avoids using the AEO-generated H2 heading (long and descriptive) as a nav item.
+  const SECTION_NAV_LABEL: Record<string, string> = {
+    features:     'Services',
+    services:     'Services',
+    about:        'About',
+    faq:          'FAQ',
+    testimonials: 'Reviews',
+    pricing:      'Pricing',
+    contact:      'Contact',
+    cta:          'Contact',
+    portfolio:    'Work',
+    team:         'Team',
+    blog:         'Blog',
+    gallery:      'Gallery',
+  };
+
+  // ── Cross-page nav: if sitePages has multiple pages, link to them; else anchor-within-page ──
+  const isMultiPage = sitePages.length > 1;
+  const seenNavLabels = new Set<string>();
+  let navLinks: string;
+
+  if (isMultiPage) {
+    // Slug → clean nav label mapping (safety net: overrides any verbose Gemini-generated title)
+    const SLUG_NAV_LABEL: Record<string, string> = {
+      home:        'Home',
+      services:    'Services',
+      service:     'Services',
+      about:       'About',
+      faq:         'FAQ',
+      faqs:        'FAQ',
+      contact:     'Contact',
+      'contact-us': 'Contact',
+      gallery:     'Gallery',
+      work:        'Work',
+      portfolio:   'Portfolio',
+      pricing:     'Pricing',
+      prices:      'Pricing',
+      team:        'Team',
+      blog:        'Blog',
+      news:        'News',
+      products:    'Products',
+      shop:        'Shop',
+      reviews:     'Reviews',
+      testimonials: 'Reviews',
+    };
+
+    navLinks = sitePages
+      .map(p => {
+        // 1. Use slug lookup, 2. fall back to first 1-2 words of title (strip brand, pipes etc.)
+        const cleanLabel = SLUG_NAV_LABEL[p.slug]
+          ?? p.title.replace(/\s*[|–—].*$/, '').trim().split(/\s+/).slice(0, 2).join(' ');
+        return `<li><a href="#" data-alias-page="${p.slug}">${cleanLabel}</a></li>`;
+      })
+      .join('');
+  } else {
+    // Single-page: anchor links
+    navLinks = aeoContent.sections
+      .filter(s => ['features', 'services', 'about', 'faq', 'testimonials', 'pricing', 'portfolio', 'team'].includes(s.type))
+      .reduce<string[]>((acc, s) => {
+        const label = SECTION_NAV_LABEL[s.type] ?? s.heading.split(' ').slice(0, 2).join(' ');
+        if (seenNavLabels.has(label)) return acc;
+        seenNavLabels.add(label);
+        acc.push(`<li><a href="#${s.type}">${label}</a></li>`);
+        return acc;
+      }, [])
+      .slice(0, 5)
+      .join('');
+  }
+
+  // postMessage bridge: nav link clicks notify the parent preview to switch pages.
+  // Falls back to URL navigation when viewed standalone (full-view mode).
+  const iframeNavScript = isMultiPage ? `
+  <script>
+    document.addEventListener('click', function(e) {
+      var link = e.target.closest('[data-alias-page]');
+      if (!link) return;
+      e.preventDefault();
+      var slug = link.getAttribute('data-alias-page');
+      if (window.parent && window.parent !== window) {
+        // Inside Alias iframe — tell parent to switch page
+        window.parent.postMessage({ type: 'alias-navigate', slug: slug }, '*');
+      } else {
+        // Standalone full-view — navigate via URL param
+        var url = new URL(window.location.href);
+        url.searchParams.set('page', slug);
+        window.location.href = url.toString();
+      }
+    });
+  </script>` : '';
 
   // Option 3: Render nav HTML based on navStyle
   const navHtml = navStyle === 'stacked-display'
@@ -1388,6 +1745,7 @@ ${navHtml}
     }
   </script>
 
+${iframeNavScript}
 </body>
 </html>`;
 }

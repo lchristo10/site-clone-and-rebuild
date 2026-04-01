@@ -2,10 +2,11 @@ import { NextRequest } from 'next/server';
 import { getJob, updateJob, updatePhase, upsertPage } from '@/lib/job-store';
 import { extractPage } from '@/lib/firecrawl';
 import { analyzeDesignTokens, generateAeoContent, auditAeoScore, generateLayoutCss } from '@/lib/gemini';
+import { generateSitePlan } from '@/lib/site-planner';
 import { resolveFonts } from '@/lib/font-resolver';
 import { buildHtml } from '@/lib/synthesizer';
 import { extractBrandDna } from '@/lib/brand-dna';
-import { BrandDNA, DesignTokens, EntityMap, StreamEvent } from '@/lib/types';
+import { BrandDNA, DesignTokens, EntityMap, PlannedSection, StreamEvent } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -111,7 +112,28 @@ function extractNavPages(
     return true;
   };
 
-  // ── Strategy 1: Firecrawl links array ─────────────────────────────────────
+  // ── Strategy 1b: <nav> element anchor scan (highest priority) ──────────────
+  // Real navigation menus have short, human-readable labels (e.g. "Services",
+  // "About Us", "Contact"). Scan <nav> elements first before hitting the full
+  // document so that genuine nav text wins over paragraph copy.
+  const navElementRe = /<nav[\s\S]*?<\/nav>/gi;
+  let navMatch: RegExpExecArray | null;
+  while ((navMatch = navElementRe.exec(html)) !== null) {
+    const navBlock = navMatch[0];
+    const navAnchorRe = /<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+    let na: RegExpExecArray | null;
+    while ((na = navAnchorRe.exec(navBlock)) !== null && pages.length <= MAX_NAV_PAGES) {
+      const href = na[1].trim();
+      const innerText = na[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      // Only use the label if it looks like a nav item (short, no sentence casing clue)
+      const label = innerText.length > 0 && innerText.length <= 30
+        ? innerText
+        : titleFromPath(href.startsWith('/') ? origin + href : href);
+      tryAdd(href, label);
+    }
+  }
+
+  // ── Strategy 2: Firecrawl links array ─────────────────────────────────────
   // Firecrawl populates this from JS-rendered DOM — most reliable.
   // Links are plain URLs without titles; we build titles from the path.
   // Heuristic: prefer shorter paths (they're more likely to be nav pages).
@@ -131,25 +153,26 @@ function extractNavPages(
     tryAdd(link, title);
   }
 
-  // ── Strategy 2: Full HTML anchor scan (tag-stripping) ─────────────────────
-  // Searches the entire document (not just <nav>) and strips inner HTML tags
-  // so <a href="/x"><span>Label</span></a> correctly yields "Label".
-  if (pages.length < 3) { // only run if strategy 1 found very little
+  // ── Strategy 3: Full HTML anchor scan (fallback) ───────────────────────────
+  // Only run if the above found very little.
+  if (pages.length < 3) {
     const anchorRe = /<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
     let m: RegExpExecArray | null;
     while ((m = anchorRe.exec(html)) !== null && pages.length <= MAX_NAV_PAGES) {
       const href = m[1].trim();
-      // Strip inner tags to get text
       const innerText = m[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-      const label = innerText || titleFromPath(href.startsWith('/') ? origin + href : href);
+      // Reject long anchor text — it's almost certainly paragraph copy, not a nav label
+      const label = innerText.length > 0 && innerText.length <= 30
+        ? innerText
+        : titleFromPath(href.startsWith('/') ? origin + href : href);
       tryAdd(href, label);
     }
   }
 
-  // ── Strategy 3: Markdown link extraction ─────────────────────────────────
+  // ── Strategy 4: Markdown link extraction ─────────────────────────────────
   // Final fallback — parse [Text](url) from the markdown representation.
   if (pages.length < 3) {
-    const mdLinkRe = /\[([^\]]{1,60})\]\((https?:\/\/[^)]+|\/[^)]*)\)/g;
+    const mdLinkRe = /\[([^\]]{1,30})\]\((https?:\/\/[^)]+|\/[^)]*)\)/g;
     let mm: RegExpExecArray | null;
     while ((mm = mdLinkRe.exec(html)) !== null && pages.length <= MAX_NAV_PAGES) {
       tryAdd(mm[2], mm[1]);
@@ -238,8 +261,11 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
         const { tokens: rawTokens, entityMap } = await analyzeDesignTokens(
           extracted.screenshotUrl,
           extracted.markdown,
-          extracted.detectedFontLinks
+          extracted.detectedFontLinks,
+          extracted.cssDefinedFonts,
+          extracted.cssTextColors
         );
+
 
         // Deduplicate colour tokens
         const colors = { ...rawTokens.colors };
@@ -311,11 +337,20 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
           pageTokens: typeof tokens,
           pageEntityMap: EntityMap,
           pageFetchedStylesheets: string[],
-          isHomepage: boolean
+          isHomepage: boolean,
+          pagePlannedSections?: PlannedSection[],
+          allPages?: { slug: string; title: string }[],
+          pageIntent?: string,
         ): Promise<string> => {
           // DRAFT
           emit({ phase: 'draft', status: 'log', message: `[ DRAFT ] Generating content for: ${pageTitle}...` });
-          const aeoContent = await generateAeoContent(pageMarkdown, pageEntityMap, pageMeta, navLinkLabels);
+          const aeoContent = await generateAeoContent(
+            pageMarkdown, pageEntityMap, pageMeta, navLinkLabels,
+            job.siteObjective, job.sitePersona,
+            pagePlannedSections, // ← blueprint from site plan
+            pageTitle,           // ← page identity for content isolation
+            pageIntent           // ← planner's stated purpose for this page
+          );
           emit({ phase: 'draft', status: 'log', message: `✓ ${pageTitle}: "${aeoContent.h1}" — ${aeoContent.sections.length} sections` });
 
           // Option A: only for homepage in brand-first mode
@@ -332,12 +367,12 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
 
           const built = buildHtml(pageTokens, aeoContent, pageEntityMap, pageUrl, {
             detectedFontLinks: allFontLinks,
-            // Sub-pages always use AEO-First; only homepage gets brand-first treatment
             fidelityMode: isHomepage ? job.fidelityMode : 'aeo-first',
             originalHtml: isHomepage ? pageHtml : undefined,
             fetchedStylesheets: isHomepage ? pageFetchedStylesheets : [],
             geminiLayoutCss,
-            brandDna,  // ← shared locked Brand DNA from pre-pass
+            brandDna,
+            sitePages: allPages ?? [],
           });
 
           // Persist aeoContent on the BuiltPage so the refine endpoint can patch sections
@@ -345,6 +380,28 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
 
           return built;
         };
+
+        // ── PHASE 2.5: PLAN ───────────────────────────────────────────────────
+        emit({ phase: 'plan', status: 'running', message: '[ PLAN ] Generating AEO site structure blueprint...' });
+        let sitePlan;
+        try {
+          sitePlan = await generateSitePlan(
+            entityMap,
+            job.siteObjective,
+            job.sitePersona,
+            navPages,
+          );
+          updateJob(jobId, { sitePlan });
+          emit({ phase: 'plan', status: 'log', message: `✓ Site plan: ${sitePlan.pages.length} page(s), ${sitePlan.pages.reduce((t, p) => t + p.sections.length, 0)} total sections` });
+          sitePlan.pages.forEach(p => {
+            const critical = p.sections.filter(s => s.importance === 'critical').length;
+            emit({ phase: 'plan', status: 'log', message: `  · ${p.title}: ${p.sections.length} sections (${critical} critical)` });
+          });
+          emit({ phase: 'plan', status: 'done', message: '[ PLAN ] Site structure blueprint complete.', data: { sitePlan } });
+        } catch (planErr) {
+          emit({ phase: 'plan', status: 'log', message: `⚠ Site plan failed — falling back to free-form generation: ${planErr instanceof Error ? planErr.message : 'unknown'}` });
+          emit({ phase: 'plan', status: 'done', message: '[ PLAN ] Skipped (using free-form fallback).' });
+        }
 
         // ── PHASE 3+4: HOMEPAGE ───────────────────────────────────────────────
         emit({ phase: 'draft', status: 'running', message: `[ DRAFT ] Processing homepage (1/${navPages.length})...` });
@@ -358,40 +415,109 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
 
         upsertPage(jobId, { slug: 'home', title: 'Home', url: job.url, html: '', status: 'running' });
 
+        // Compute the canonical page list for cross-site nav — known ahead of time from plan
+        const deepHubArch = job.sitePersona?.architecture === 'deep-hub';
+        const allSitePagesForNav: { slug: string; title: string }[] = [
+          { slug: 'home', title: 'Home' },
+          ...subPages.map(p => ({ slug: p.slug, title: p.title })),
+          ...(deepHubArch && sitePlan
+            ? sitePlan.pages
+                .filter(p => p.slug !== 'home' && !subPages.some(sp => sp.slug === p.slug))
+                .map(p => ({ slug: p.slug, title: p.title }))
+            : []),
+        ];
+
+        const homePlan = sitePlan?.pages.find(p => p.slug === 'home');
         const homeHtml = await buildPage(
           'home', 'Home', job.url,
           extracted.markdown, extracted.meta, extracted.html,
           tokens, entityMap, extracted.fetchedStylesheets,
-          true
+          true,
+          homePlan?.sections,
+          allSitePagesForNav,
+          homePlan?.intent,
         );
 
         // buildPage already calls upsertPage with aeoContent — just sync remaining phases
         updatePhase(jobId, 'draft', { status: 'done', completedAt: Date.now() });
+        emit({ phase: 'draft', status: 'done', message: '[ DRAFT ] Content strategy complete.' });
         updatePhase(jobId, 'synthesize', { status: 'done', completedAt: Date.now(), builtHtml: homeHtml });
         emit({ phase: 'synthesize', status: 'log', message: `✓ Homepage: ${homeHtml.length} chars` });
         emit({ phase: 'synthesize', status: 'done', message: '[ SYNTHESIZE ] Homepage complete.' });
 
-        // ── SUB-PAGES ─────────────────────────────────────────────────────────
-        if (subPages.length > 0) {
-          emit({ phase: 'system', status: 'log', message: `▶ Processing ${subPages.length} sub-page(s)...` });
 
-          for (let i = 0; i < subPages.length; i++) {
-            const page = subPages[i];
-            emit({ phase: 'system', status: 'log', message: `▶ Page ${i + 2}/${navPages.length}: ${page.title} (${page.url})` });
+        // ── SUB-PAGES ─────────────────────────────────────────────────────────
+        //
+        // Two sources of sub-pages:
+        //  A. Firecrawl-discovered pages (real URLs we can scrape)
+        //  B. Site-plan-only pages (deep-hub: generated from homepage content
+        //     when the original site is single-page / SPA / anchor-based)
+        //
+        // When architecture='deep-hub', the sitePlan is authoritative — we
+        // build ALL plan pages, even if Firecrawl couldn't discover them.
+        const isDeepHub = job.sitePersona?.architecture === 'deep-hub';
+
+        // Pages in the plan that were NOT discovered by Firecrawl
+        const planOnlyPages: NavPage[] = [];
+        if (isDeepHub && sitePlan) {
+          for (const planPage of sitePlan.pages) {
+            if (planPage.slug === 'home') continue;
+            const alreadyDiscovered = subPages.some(p => p.slug === planPage.slug);
+            if (!alreadyDiscovered) {
+              planOnlyPages.push({
+                slug: planPage.slug,
+                title: planPage.title,
+                url: `${job.url.replace(/\/$/, '')}/${planPage.slug}`,
+              });
+            }
+          }
+          if (planOnlyPages.length > 0) {
+            emit({ phase: 'system', status: 'log', message: `▶ Deep Hub: ${planOnlyPages.length} plan-only page(s) will be synthesised from homepage content` });
+          }
+        }
+
+        const allSubPages = [...subPages, ...planOnlyPages];
+
+        if (allSubPages.length > 0) {
+          emit({ phase: 'system', status: 'log', message: `▶ Processing ${allSubPages.length} sub-page(s)...` });
+
+          for (let i = 0; i < allSubPages.length; i++) {
+            const page = allSubPages[i];
+            const isPlanOnly = planOnlyPages.some(p => p.slug === page.slug);
+            emit({ phase: 'system', status: 'log', message: `▶ Page ${i + 2}/${allSubPages.length + 1}: ${page.title}${isPlanOnly ? ' (synthesised)' : ` (${page.url})`}` });
             upsertPage(jobId, { slug: page.slug, title: page.title, url: page.url, html: '', status: 'running' });
 
             try {
-              const pageExtracted = await extractPage(page.url);
-              emit({ phase: 'system', status: 'log', message: `  ✓ Scraped: ${pageExtracted.markdown.length} chars of content` });
+              let pageMarkdown: string;
+              let pageMeta: { title?: string; description?: string };
+              let pageHtmlSource: string;
 
+              if (isPlanOnly) {
+                // No real URL — use homepage content as source material.
+                // The sitePlan section blueprint ensures each page is distinct.
+                pageMarkdown = extracted.markdown;
+                pageMeta = { title: page.title, description: entityMap.primaryService };
+                pageHtmlSource = extracted.html;
+                emit({ phase: 'system', status: 'log', message: `  ↻ Synthesising from homepage content (plan-guided sections)` });
+              } else {
+                const pageExtracted = await extractPage(page.url);
+                pageMarkdown = pageExtracted.markdown;
+                pageMeta = pageExtracted.meta;
+                pageHtmlSource = pageExtracted.html;
+                emit({ phase: 'system', status: 'log', message: `  ✓ Scraped: ${pageMarkdown.length} chars of content` });
+              }
+
+              const pagePlan = sitePlan?.pages.find(p => p.slug === page.slug);
               const pageHtml = await buildPage(
                 page.slug, page.title, page.url,
-                pageExtracted.markdown, pageExtracted.meta, pageExtracted.html,
-                tokens, entityMap, [], // sub-pages: no brand-first treatment
-                false
+                pageMarkdown, pageMeta, pageHtmlSource,
+                tokens, entityMap, [],
+                false,
+                pagePlan?.sections,
+                allSitePagesForNav,
+                pagePlan?.intent,
               );
 
-              // buildPage already calls upsertPage with aeoContent — no extra upsert needed
               emit({ phase: 'system', status: 'log', message: `  ✓ ${page.title} built: ${pageHtml.length} chars` });
 
             } catch (err) {
@@ -401,31 +527,43 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
             }
           }
 
-          emit({ phase: 'system', status: 'log', message: `✓ All ${navPages.length} pages processed.` });
+          emit({ phase: 'system', status: 'log', message: `✓ All ${allSubPages.length + 1} pages processed.` });
         }
 
-        // ── PHASE 5: AUDIT (homepage) ─────────────────────────────────────────
+        const totalPages = 1 + allSubPages.length;
+
+
+        // ── PHASE 5: AUDIT ─────────────────────────────────────────────────────
         emit({ phase: 'audit', status: 'running', message: '[ AUDIT ] Running simulated AI crawler...' });
         updatePhase(jobId, 'audit', { status: 'running', startedAt: Date.now() });
 
         const crawledTitles = navPages.map(p => p.title);
-        const score = await auditAeoScore(homeHtml, crawledTitles);
+
+        // Run the rebuilt-site audit + original-site audit in parallel
+        const originalMarkdown = extracted.markdown;
+        const [score, originalScore] = await Promise.all([
+          auditAeoScore(homeHtml, crawledTitles),
+          auditAeoScore(
+            `<html><body>${originalMarkdown.substring(0, 8000)}</body></html>`,
+            crawledTitles
+          ).catch(() => null),
+        ]);
+
+        if (originalScore) {
+          updateJob(jobId, { originalScore });
+        }
 
         emit({ phase: 'audit', status: 'log', message: `✓ Overall AEO Score: ${score.overall}/100` });
-        emit({ phase: 'audit', status: 'log', message: `✓ Content Structure: ${score.content_structure}/100` });
-        emit({ phase: 'audit', status: 'log', message: `✓ E-E-A-T: ${score.eeat}/100` });
-        emit({ phase: 'audit', status: 'log', message: `✓ Technical: ${score.technical}/100` });
-        emit({ phase: 'audit', status: 'log', message: `✓ Entity Alignment: ${score.entity_alignment}/100` });
-        emit({ phase: 'audit', status: 'log', message: `✓ AI can summarize: ${score.canSummarizeIn2Sentences ? 'YES ✓' : 'NO — needs improvement'}` });
-        emit({ phase: 'audit', status: 'log', message: `✓ AI summary: "${score.aiSummary}"` });
-        if (score.missingPageSuggestions?.length > 0) {
-          emit({ phase: 'audit', status: 'log', message: `⚠ Missing pages suggested: ${score.missingPageSuggestions.join(', ')}` });
+        if (originalScore) {
+          emit({ phase: 'audit', status: 'log', message: `✓ Original site score: ${originalScore.overall}/100 → improvement: +${score.overall - originalScore.overall}` });
         }
+        emit({ phase: 'audit', status: 'log', message: `✓ AI can summarize: ${score.canSummarizeIn2Sentences ? 'YES ✓' : 'NO — needs improvement'}` });
 
         updatePhase(jobId, 'audit', { status: 'done', completedAt: Date.now(), score });
         updateJob(jobId, { status: 'done' });
-        emit({ phase: 'audit', status: 'done', message: '[ AUDIT ] Complete.', data: score });
-        emit({ phase: 'system', status: 'done', message: `▶ ALIAS COMPILER complete. ${navPages.length} page(s) ready.` });
+        emit({ phase: 'audit', status: 'done', message: '[ AUDIT ] Complete.', data: { score, originalScore } });
+        emit({ phase: 'system', status: 'done', message: `▶ ALIAS COMPILER complete. ${totalPages} page(s) ready.` });
+
 
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error';

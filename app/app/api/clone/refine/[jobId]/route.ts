@@ -28,12 +28,31 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: 'Job is not complete yet' }, { status: 400 });
   }
 
-  const body = await req.json() as { pageSlug?: string; sectionType?: string; instruction?: string };
-  const { pageSlug, sectionType, instruction } = body;
+  const body = await req.json() as {
+    pageSlug?: string;
+    sectionType?: string;
+    instruction?: string;
+    recommendationId?: string;
+    userComment?: string;
+  };
+  const { pageSlug, sectionType, userComment, recommendationId } = body;
+  let { instruction } = body;
+
+  // If applying a strategist recommendation, build instruction from it
+  if (recommendationId && job.strategistReport) {
+    const rec = job.strategistReport.recommendations.find(r => r.id === recommendationId);
+    if (rec) {
+      instruction = rec.suggestedAction;
+      if (userComment?.trim()) {
+        instruction += `\n\nAdditional user direction: ${userComment.trim()}`;
+      }
+    }
+  }
 
   if (!pageSlug || !sectionType || !instruction?.trim()) {
     return NextResponse.json({ error: 'pageSlug, sectionType, and instruction are required' }, { status: 400 });
   }
+
 
   const page = getPage(jobId, pageSlug);
   if (!page) {

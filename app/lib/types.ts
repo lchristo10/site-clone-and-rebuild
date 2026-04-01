@@ -1,5 +1,24 @@
 export type PhaseStatus = 'pending' | 'running' | 'done' | 'error';
 export type FidelityMode = 'aeo-first' | 'brand-first';
+export type SiteObjective = 'sell-products' | 'make-bookings' | 'capture-leads' | 'other';
+export type AeoImportance = 'critical' | 'important' | 'optional';
+
+/**
+ * 5-dimension persona captured from the Vibe Forge duels.
+ * Each field drives both copy strategy (Gemini prompts) and design token adjustments.
+ */
+export interface SitePersona {
+  /** Duel 1 — Layout density */
+  layout: 'spacious' | 'dense';
+  /** Duel 2 — Voice / tone */
+  tone: 'professional' | 'disruptor';
+  /** Duel 3 — Visual language */
+  imagery: 'human-centric' | 'abstract-tech';
+  /** Duel 4 — Motion & interaction */
+  motion: 'static' | 'high-motion';
+  /** Duel 5 — Information architecture */
+  architecture: 'linear-story' | 'deep-hub';
+}
 
 export interface DesignTokens {
   colors: {
@@ -88,7 +107,70 @@ export interface AeoScore {
   aiSummary: string;
   recommendations: string[];
   canSummarizeIn2Sentences: boolean;
-  missingPageSuggestions: string[]; // Pages the site should have for AEO completeness
+  missingPageSuggestions: string[];
+}
+
+// ── AEO Site Structure (Tactical Grid) ───────────────────────────────────────
+
+/**
+ * One cell in the tactical grid — a planned section for a specific page.
+ */
+export interface PlannedSection {
+  /** Section type, aligned with AeoSection['type'] */
+  type: 'hero' | 'features' | 'services' | 'about' | 'testimonials' | 'faq' | 'cta' | 'generic';
+  /** 2-4 word cell label shown in the grid, e.g. "Trust signals" */
+  label: string;
+  /** Why this section exists from an AEO perspective (1-2 sentences) */
+  rationale: string;
+  /** How critical this section is for AEO performance */
+  importance: AeoImportance;
+}
+
+/**
+ * One column in the tactical grid — a planned page.
+ */
+export interface PlannedPage {
+  slug: string;
+  title: string;
+  /** What this page is designed to answer from an AEO perspective */
+  intent: string;
+  sections: PlannedSection[];
+}
+
+/**
+ * The full AEO site structure plan, generated before synthesis.
+ * Drives section ordering and content focus for every page.
+ */
+export interface SitePlan {
+  generatedAt: number;
+  pages: PlannedPage[];
+}
+
+// ── AI Strategist ─────────────────────────────────────────────────────────────
+
+export type RecommendationPriority = 'high' | 'medium' | 'low';
+export type RecommendationStatus = 'pending' | 'accepted' | 'rejected' | 'applied';
+
+export interface StrategistRecommendation {
+  id: string;
+  priority: RecommendationPriority;
+  /** Which section type this recommendation targets (or 'global') */
+  sectionType: string;
+  title: string;
+  rationale: string;
+  /** The specific improvement Gemini should make when patching */
+  suggestedAction: string;
+  status: RecommendationStatus;
+  userComment?: string;
+}
+
+export interface StrategistReport {
+  generatedAt: number;
+  beforeScore: AeoScore;   // score of original scraped site
+  afterScore: AeoScore;    // score of rebuilt site at time of analysis
+  recommendations: StrategistRecommendation[];
+  /** One-paragraph executive summary from the AI Strategist */
+  executiveSummary: string;
 }
 
 export interface PhaseResult {
@@ -101,15 +183,13 @@ export interface PhaseResult {
 
 // ── Multi-page support ────────────────────────────────────────────────────────
 
-/** A single discovered nav page and its rebuilt HTML output. */
 export interface BuiltPage {
-  slug: string;       // e.g. 'home', 'studio', 'services'
-  title: string;      // Display label from the nav link
-  url: string;        // Original URL of this page
-  html: string;       // Rebuilt/synthesised HTML
+  slug: string;
+  title: string;
+  url: string;
+  html: string;
   status: 'pending' | 'running' | 'done' | 'error';
   error?: string;
-  /** Section schema stored per-page so the refine endpoint can patch individual sections */
   aeoContent?: AeoContent;
 }
 
@@ -119,10 +199,16 @@ export interface JobState {
   status: 'queued' | 'running' | 'done' | 'error';
   createdAt: number;
   fidelityMode: FidelityMode;
-  /** Locked brand identity extracted from the homepage — shared across all pages */
+  siteObjective: SiteObjective;
+  sitePersona?: SitePersona;
   brandDna?: BrandDNA;
-  /** All discovered and rebuilt pages. Key = slug. */
   pages: Record<string, BuiltPage>;
+  /** AEO site structure plan — generated before synthesis begins */
+  sitePlan?: SitePlan;
+  /** AEO score of the original scraped site (before rebuild) */
+  originalScore?: AeoScore;
+  /** AI Strategist report — generated on demand after build */
+  strategistReport?: StrategistReport;
   phases: {
     extract: PhaseResult & {
       screenshotUrl?: string;
@@ -140,7 +226,7 @@ export interface JobState {
 }
 
 export interface StreamEvent {
-  phase: 'extract' | 'analyze' | 'draft' | 'synthesize' | 'audit' | 'system';
+  phase: 'extract' | 'analyze' | 'plan' | 'draft' | 'synthesize' | 'audit' | 'system';
   status: PhaseStatus | 'log';
   message: string;
   data?: unknown;

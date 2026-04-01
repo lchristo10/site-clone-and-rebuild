@@ -102,15 +102,43 @@ interface AeoScoreGridProps {
   eeat: number;
   technical: number;
   entity_alignment: number;
+  /** 'horizontal' = pipeline compact row (default), 'vertical' = report page stacked */
+  layout?: 'horizontal' | 'vertical';
 }
 
-export function AeoScoreGrid({ overall, content_structure, eeat, technical, entity_alignment }: AeoScoreGridProps) {
+export function AeoScoreGrid({ overall, content_structure, eeat, technical, entity_alignment, layout = 'horizontal' }: AeoScoreGridProps) {
+  if (layout === 'vertical') {
+    return (
+      <div className="flex flex-col items-center gap-6">
+        {/* Overall ring — centred, larger */}
+        <AeoScoreRing score={overall} label="Overall AEO Score" size="lg" />
+
+        {/* Divider */}
+        <div className="w-full h-px bg-border/30" />
+
+        {/* Sub-scores — 2×2 grid */}
+        <div className="w-full grid grid-cols-2 gap-4">
+          <AeoScoreRing score={content_structure} label="Content Structure" size="sm" />
+          <AeoScoreRing score={eeat} label="E-E-A-T" size="sm" />
+          <AeoScoreRing score={technical} label="Technical" size="sm" />
+          <AeoScoreRing score={entity_alignment} label="Entity Align" size="sm" />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-4">
-      <div className="flex justify-center">
+    <div className="flex items-center gap-4">
+      {/* Overall — left */}
+      <div className="flex-shrink-0">
         <AeoScoreRing score={overall} label="Overall AEO Score" size="lg" />
       </div>
-      <div className="grid grid-cols-2 gap-4 pt-2">
+
+      {/* Divider */}
+      <div className="w-px self-stretch bg-border/30 flex-shrink-0" />
+
+      {/* Sub-scores — 2×2 right */}
+      <div className="flex-1 grid grid-cols-2 gap-x-2 gap-y-3">
         <AeoScoreRing score={content_structure} label="Content Structure" size="sm" />
         <AeoScoreRing score={eeat} label="E-E-A-T" size="sm" />
         <AeoScoreRing score={technical} label="Technical" size="sm" />
@@ -119,3 +147,5 @@ export function AeoScoreGrid({ overall, content_structure, eeat, technical, enti
     </div>
   );
 }
+
+

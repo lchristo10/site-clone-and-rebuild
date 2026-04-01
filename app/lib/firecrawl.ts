@@ -17,9 +17,13 @@ export interface ExtractResult {
   markdown: string;
   html: string;
   screenshotUrl: string;
-  detectedFontLinks: string[];    // Option 1: font <link> hrefs
-  fetchedStylesheets: string[];   // Option C: raw CSS content from linked stylesheets
-  links: string[];                // All page links from Firecrawl (most reliable for nav discovery)
+  detectedFontLinks: string[];      // CDN font <link> hrefs (Google Fonts, Typekit etc.)
+  fetchedStylesheets: string[];     // Raw CSS content from linked stylesheets
+  links: string[];                  // All page links (nav discovery)
+  /** Fix 1: Font families declared in @font-face rules in the fetched CSS */
+  cssDefinedFonts: CssFontInfo;
+  /** Fix 2: Distinct text colours (primary/secondary/accent) from CSS */
+  cssTextColors: CssTextColors;
   meta: {
     title?: string;
     description?: string;
@@ -28,7 +32,27 @@ export interface ExtractResult {
   };
 }
 
-// ── Option 1: Font link extraction ───────────────────────────────────────────
+// ── CSS font & colour info types ──────────────────────────────────────────────
+
+export interface CssFontInfo {
+  /** All font-family names declared in @font-face blocks */
+  fontFaceNames: string[];
+  /** Font applied to h1/h2/h3 selectors (most specific match wins) */
+  headingFont: string | null;
+  /** Font applied to body/p selectors */
+  bodyFont: string | null;
+}
+
+export interface CssTextColors {
+  /** color: on h1/h2/h3 selectors — primary heading text colour */
+  headingColor: string | null;
+  /** color: on body/p selectors — primary body text colour */
+  bodyColor: string | null;
+  /** color: on a/button selectors — accent/interactive text colour */
+  linkColor: string | null;
+}
+
+// ── Option 1: Font link extraction (CDN links in HTML) ────────────────────────
 
 const FONT_DOMAINS = [
   'fonts.googleapis.com',
@@ -63,6 +87,92 @@ function extractFontLinks(html: string): string[] {
   }
 
   return links;
+}
+
+// ── Fix 1: @font-face + element font extraction ───────────────────────────────
+
+/**
+ * Extracts font family names from @font-face declarations in CSS.
+ * Also scans heading (h1/h2/h3) and body/p selectors to determine
+ * which fonts are actually applied to those elements.
+ */
+function extractCssFonts(cssChunks: string[]): CssFontInfo {
+  const allCss = cssChunks.join('\n');
+
+  // 1. All @font-face declared names
+  const fontFaceNames: string[] = [];
+  const fontFaceRe = /@font-face\s*\{[^}]*font-family\s*:\s*["']?([^"';}\n]+)["']?/gi;
+  let m: RegExpExecArray | null;
+  while ((m = fontFaceRe.exec(allCss)) !== null) {
+    const name = m[1].trim().replace(/["']/g, '');
+    if (name && !fontFaceNames.includes(name)) fontFaceNames.push(name);
+  }
+
+  // Helper: extract font-family value for a given CSS selector pattern
+  function fontForSelector(selectorPattern: RegExp): string | null {
+    // Find all rule blocks matching the selector
+    // Strategy: scan for selector, then capture the { ... } block
+    const ruleRe = new RegExp(
+      `(?:^|[};])\\s*([^{]*${selectorPattern.source}[^{]*)\\s*\\{([^}]*)\\}`,
+      'gim'
+    );
+    const candidates: string[] = [];
+    let rm: RegExpExecArray | null;
+    while ((rm = ruleRe.exec(allCss)) !== null) {
+      const block = rm[2];
+      const ffMatch = /font-family\s*:\s*([^;}\n]+)/i.exec(block);
+      if (ffMatch) {
+        // Take the first family name (before comma)
+        const first = ffMatch[1].split(',')[0].trim().replace(/["']/g, '');
+        if (first && first.length > 1) candidates.push(first);
+      }
+    }
+    return candidates[0] ?? null;
+  }
+
+  const headingFont = fontForSelector(/h[123]/) ?? fontForSelector(/heading/);
+  const bodyFont    = fontForSelector(/^body$/) ?? fontForSelector(/^p$/) ?? fontForSelector(/body/);
+
+  return { fontFaceNames, headingFont, bodyFont };
+}
+
+// ── Fix 2: Text colour extraction ────────────────────────────────────────────
+
+/**
+ * Extracts distinct text colours from CSS for headings, body, and links.
+ * Looks at actual selector context so we distinguish UI element colours
+ * from text colours.
+ */
+function extractCssTextColors(cssChunks: string[]): CssTextColors {
+  const allCss = cssChunks.join('\n');
+
+  function colorForSelector(selectorPattern: RegExp): string | null {
+    const ruleRe = new RegExp(
+      `(?:^|[};])\\s*([^{]*${selectorPattern.source}[^{]*)\\s*\\{([^}]*)\\}`,
+      'gim'
+    );
+    const candidates: string[] = [];
+    let rm: RegExpExecArray | null;
+    while ((rm = ruleRe.exec(allCss)) !== null) {
+      const block = rm[2];
+      // color: (but not background-color:)
+      const colorMatch = /(?<!\S)color\s*:\s*(#[0-9a-fA-F]{3,8}|rgba?\([^)]+\)|[a-z]+)/i.exec(block);
+      if (colorMatch) {
+        const c = colorMatch[1].trim();
+        // Skip transparent/inherit/initial
+        if (!['transparent', 'inherit', 'initial', 'currentcolor', 'unset'].includes(c.toLowerCase())) {
+          candidates.push(c);
+        }
+      }
+    }
+    return candidates[0] ?? null;
+  }
+
+  const headingColor = colorForSelector(/h[123]/);
+  const bodyColor    = colorForSelector(/^body$/) ?? colorForSelector(/^p$/);
+  const linkColor    = colorForSelector(/^a$/) ?? colorForSelector(/^a:link/);
+
+  return { headingColor, bodyColor, linkColor };
 }
 
 // ── Option C: Stylesheet fetching ─────────────────────────────────────────────
@@ -178,12 +288,24 @@ export async function extractPage(url: string): Promise<ExtractResult> {
     ? await fetchStylesheets(stylesheetUrls)
     : [];
 
+  // Fix 1 + 2: parse actual font names and text colors from the fetched CSS
+  // Also scan the raw HTML inline styles as a fallback
+  const allCssChunks = [
+    ...fetchedStylesheets,
+    // Extract any <style> blocks from the raw HTML
+    ...[...rawHtml.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map(m => m[1]),
+  ];
+  const cssDefinedFonts = extractCssFonts(allCssChunks);
+  const cssTextColors   = extractCssTextColors(allCssChunks);
+
   return {
     markdown: doc.markdown || '',
     html: rawHtml,
     screenshotUrl: doc.screenshot || '',
     detectedFontLinks,
     fetchedStylesheets,
+    cssDefinedFonts,
+    cssTextColors,
     links: Array.isArray(doc.links) ? doc.links : [],
     meta: {
       title: doc.metadata?.title,
@@ -193,3 +315,4 @@ export async function extractPage(url: string): Promise<ExtractResult> {
     },
   };
 }
+

@@ -1,4 +1,4 @@
-import { BuiltPage, FidelityMode, JobState } from './types';
+import { BuiltPage, FidelityMode, JobState, SiteObjective, SitePersona } from './types';
 
 const TTL_MS = 1000 * 60 * 60; // 1 hour
 
@@ -25,7 +25,9 @@ function cleanup() {
 export function createJob(
   jobId: string,
   url: string,
-  fidelityMode: FidelityMode = 'aeo-first'
+  fidelityMode: FidelityMode = 'aeo-first',
+  siteObjective: SiteObjective = 'other',
+  sitePersona?: SitePersona
 ): JobState {
   cleanup();
   const job: JobState = {
@@ -34,6 +36,8 @@ export function createJob(
     status: 'queued',
     createdAt: Date.now(),
     fidelityMode,
+    siteObjective,
+    sitePersona,
     pages: {},
     phases: {
       extract: { status: 'pending' },
