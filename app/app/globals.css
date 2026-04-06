@@ -158,7 +158,7 @@
 /* ── Terminal log ───────────────────────────────────────────────────── */
 .terminal-font {
   font-family: var(--font-geist-mono), ui-monospace, 'Courier New', monospace;
-  font-size: max(10px, 0.6875rem);
+  font-size: max(10px, 0.75rem);
 }
 
 /* ── Input glow ─────────────────────────────────────────────────────── */

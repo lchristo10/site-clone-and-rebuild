@@ -53,6 +53,14 @@ export async function GET(_req: NextRequest, ctx: RouteContext) {
 
     // AI Strategist report
     strategistReport: job.strategistReport ?? null,
+
+    // Original (pre-rebuild) AEO score — null if the original-site audit failed
+    originalScore: job.originalScore ?? null,
+
+    // Brand DNA — extracted during the pipeline pre-pass
+    brandDna: job.brandDna ?? null,
+
+    // Whether the brand theme has been committed to all pages
+    brandThemeApplied: job.brandThemeApplied ?? false,
   });
 }
-

@@ -261,7 +261,7 @@ export function FeedbackBar({ jobId, activePage, activeSections, onApplied }: Fe
           >
             <span className="w-1.5 h-1.5 rounded-full bg-alias-green animate-pulse" />
             <span>Feedback</span>
-            <span className="text-muted-foreground/30 normal-case tracking-normal text-[9px]">
+            <span className="text-muted-foreground/30 normal-case tracking-normal text-[10px]">
               — click to edit
             </span>
           </button>
@@ -290,7 +290,7 @@ export function FeedbackBar({ jobId, activePage, activeSections, onApplied }: Fe
             <div className="flex items-center gap-2 flex-shrink-0">
               <DragIcon className="w-2.5 h-2.5 text-muted-foreground/30" />
               <span className="w-1.5 h-1.5 rounded-full bg-alias-green" />
-              <span className="text-[9px] font-mono uppercase tracking-[0.25em] text-muted-foreground">
+              <span className="text-[10px] font-mono uppercase tracking-[0.25em] text-muted-foreground">
                 Page Feedback
               </span>
             </div>
@@ -303,7 +303,7 @@ export function FeedbackBar({ jobId, activePage, activeSections, onApplied }: Fe
                 value={section}
                 onChange={e => setSection(e.target.value)}
                 disabled={status === 'loading'}
-                className="text-[9px] font-mono bg-transparent border border-border/40 rounded-md px-2 py-1
+                className="text-[10px] font-mono bg-transparent border border-border/40 rounded-md px-2 py-1
                   text-muted-foreground focus:outline-none focus:border-alias-green/40
                   hover:border-border transition-colors cursor-pointer disabled:opacity-50"
               >
@@ -314,7 +314,7 @@ export function FeedbackBar({ jobId, activePage, activeSections, onApplied }: Fe
               </select>
               <button
                 onClick={() => setExpanded(false)}
-                className="text-[9px] font-mono text-muted-foreground/40 hover:text-foreground transition-colors leading-none"
+                className="text-[10px] font-mono text-muted-foreground/40 hover:text-foreground transition-colors leading-none"
               >
                 ✕
               </button>
@@ -342,14 +342,14 @@ export function FeedbackBar({ jobId, activePage, activeSections, onApplied }: Fe
                 disabled={status === 'loading'}
                 className="w-full bg-transparent px-4 pt-3 pb-2 text-sm font-mono text-foreground
                   resize-none focus:outline-none placeholder:text-muted-foreground/30
-                  placeholder:text-xs placeholder:font-sans disabled:opacity-60 leading-relaxed"
+                  placeholder:text-sm placeholder:font-sans disabled:opacity-60 leading-relaxed"
               />
 
               {/* Live recording indicator */}
               {listening && (
                 <div className="absolute top-2.5 right-3 flex items-center gap-1.5 pointer-events-none">
                   <span className="w-1.5 h-1.5 rounded-full bg-alias-green animate-ping" />
-                  <span className="text-[8px] font-mono text-alias-green uppercase tracking-wider">rec</span>
+                  <span className="text-[10px] font-mono text-alias-green uppercase tracking-wider">rec</span>
                 </div>
               )}
             </div>
@@ -362,7 +362,7 @@ export function FeedbackBar({ jobId, activePage, activeSections, onApplied }: Fe
                     onClick={listening ? stopListening : startListening}
                     disabled={status === 'loading'}
                     title={listening ? 'Stop recording' : 'Voice input'}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[9px] font-mono
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] font-mono
                       uppercase tracking-wider transition-all disabled:opacity-40 ${
                       listening
                         ? 'border-alias-green bg-alias-green/10 text-alias-green'
@@ -375,30 +375,30 @@ export function FeedbackBar({ jobId, activePage, activeSections, onApplied }: Fe
                 )}
 
                 {feedback.length > 0 && (
-                  <span className="text-[9px] font-mono text-muted-foreground/30">
+                  <span className="text-[10px] font-mono text-muted-foreground/30">
                     {feedback.length} chars
                   </span>
                 )}
 
-                <span className="text-[8px] font-mono text-muted-foreground/20 hidden sm:block">
+                <span className="text-[10px] font-mono text-muted-foreground/20 hidden sm:block">
                   ⌘↵ to apply
                 </span>
               </div>
 
               <div className="flex items-center gap-2">
                 {status === 'error' && (
-                  <span className="text-[9px] font-mono text-alias-red max-w-[200px] truncate" title={errorMsg}>
+                  <span className="text-[10px] font-mono text-alias-red max-w-[200px] truncate" title={errorMsg}>
                     ✗ {errorMsg}
                   </span>
                 )}
                 {status === 'success' && (
-                  <span className="text-[9px] font-mono text-alias-green">✓ Applied</span>
+                  <span className="text-[10px] font-mono text-alias-green">✓ Applied</span>
                 )}
 
                 <button
                   onClick={handleSubmit}
                   disabled={!feedback.trim() || status === 'loading'}
-                  className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg border text-[9px] font-mono
+                  className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg border text-[10px] font-mono
                     uppercase tracking-wider transition-all ${
                     status === 'loading'
                       ? 'border-alias-green/30 text-alias-green/50 bg-alias-green/5 cursor-wait'

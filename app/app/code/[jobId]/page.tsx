@@ -112,9 +112,9 @@ export default function CodeViewPage({ params }: Props) {
       {/* ── Nav ──────────────────────────────────────────────────────────── */}
       <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-3 border-b border-border/30 bg-background/90 backdrop-blur-md gap-3">
         <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity flex-shrink-0">
-          <span className="text-[9px] font-mono uppercase tracking-[0.3em] text-muted-foreground">ALIAS</span>
+          <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-muted-foreground">ALIAS</span>
           <span className="text-muted-foreground/30 mx-1">·</span>
-          <span className="text-[9px] font-mono uppercase tracking-[0.3em] text-alias-green">COMPILER</span>
+          <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-alias-green">COMPILER</span>
         </Link>
 
         {/* Page switcher */}
@@ -124,7 +124,7 @@ export default function CodeViewPage({ params }: Props) {
               <button
                 key={p.slug}
                 onClick={() => setActivePage(p.slug)}
-                className={`px-2.5 py-1 text-[9px] font-mono uppercase tracking-wider rounded border transition-all ${
+                className={`px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider rounded border transition-all ${
                   activePage === p.slug
                     ? 'bg-alias-green text-background border-alias-green font-bold'
                     : 'text-muted-foreground border-border hover:text-foreground hover:border-foreground/30'
@@ -138,31 +138,31 @@ export default function CodeViewPage({ params }: Props) {
 
         {/* Actions */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          <span className="text-[9px] font-mono text-muted-foreground/40 hidden sm:block">
+          <span className="text-[10px] font-mono text-muted-foreground/40 hidden sm:block">
             {lineCount.toLocaleString()} lines
           </span>
           <button
             onClick={copyCode}
             disabled={!activeFileData}
-            className="px-3 py-1.5 text-[9px] font-mono uppercase tracking-wider border border-border text-muted-foreground rounded hover:text-foreground hover:border-foreground/30 transition-all disabled:opacity-30"
+            className="px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider border border-border text-muted-foreground rounded hover:text-foreground hover:border-foreground/30 transition-all disabled:opacity-30"
           >
             {copied ? '✓ Copied' : '⧉ Copy'}
           </button>
           <a
             href={`/preview/${jobId}`}
-            className="px-3 py-1.5 text-[9px] font-mono uppercase tracking-wider border border-border text-muted-foreground rounded hover:text-foreground hover:border-foreground/30 transition-all"
+            className="px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider border border-border text-muted-foreground rounded hover:text-foreground hover:border-foreground/30 transition-all"
           >
             ◈ Preview
           </a>
           <a
             href={`/api/clone/download/${jobId}`}
-            className="px-3 py-1.5 text-[9px] font-mono uppercase tracking-wider border border-border text-muted-foreground rounded hover:text-foreground hover:border-foreground/30 transition-all"
+            className="px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider border border-border text-muted-foreground rounded hover:text-foreground hover:border-foreground/30 transition-all"
           >
             ↓ ZIP
           </a>
           <Link
             href={`/clone/${jobId}`}
-            className="px-3 py-1.5 text-[9px] font-mono uppercase tracking-wider border border-border text-muted-foreground rounded hover:text-foreground hover:border-foreground/30 transition-all"
+            className="px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider border border-border text-muted-foreground rounded hover:text-foreground hover:border-foreground/30 transition-all"
           >
             ← Pipeline
           </Link>
@@ -175,16 +175,16 @@ export default function CodeViewPage({ params }: Props) {
         {/* File tree sidebar */}
         <aside className="w-52 flex-shrink-0 border-r border-border/30 bg-card/50 flex flex-col overflow-y-auto">
           <div className="px-3 py-2 border-b border-border/20">
-            <p className="text-[8px] font-mono uppercase tracking-[0.25em] text-muted-foreground/50">Files</p>
+            <p className="text-[10px] font-mono uppercase tracking-[0.25em] text-muted-foreground/50">Files</p>
           </div>
           {loading ? (
             <div className="flex-1 flex items-center justify-center">
-              <span className="text-[9px] font-mono text-muted-foreground/40 animate-pulse">Loading...</span>
+              <span className="text-[10px] font-mono text-muted-foreground/40 animate-pulse">Loading...</span>
             </div>
           ) : error ? (
             <div className="p-3">
-              <p className="text-[9px] font-mono text-alias-red">{error}</p>
-              <p className="text-[9px] font-mono text-muted-foreground/40 mt-2">
+              <p className="text-[10px] font-mono text-alias-red">{error}</p>
+              <p className="text-[10px] font-mono text-muted-foreground/40 mt-2">
                 Run the pipeline first to generate code.
               </p>
             </div>
@@ -198,7 +198,7 @@ export default function CodeViewPage({ params }: Props) {
                   <li key={f.name}>
                     {dir && (
                       <div className="px-3 pt-3 pb-0.5">
-                        <p className="text-[8px] font-mono text-muted-foreground/30 uppercase tracking-widest truncate">{dir}/</p>
+                        <p className="text-[10px] font-mono text-muted-foreground/30 uppercase tracking-widest truncate">{dir}/</p>
                       </div>
                     )}
                     <button
@@ -209,7 +209,7 @@ export default function CodeViewPage({ params }: Props) {
                           : 'text-muted-foreground hover:text-foreground hover:bg-foreground/5'
                       }`}
                     >
-                      <span className="text-[8px] font-mono opacity-60 flex-shrink-0">
+                      <span className="text-[10px] font-mono opacity-60 flex-shrink-0">
                         {FILE_ICONS[f.language] ?? f.language}
                       </span>
                       <span className="text-[10px] font-mono truncate">{filename}</span>
@@ -228,12 +228,12 @@ export default function CodeViewPage({ params }: Props) {
           {activeFileData && (
             <div className="border-b border-border/30 bg-card/30 flex items-center px-0 flex-shrink-0">
               <div className="flex items-center gap-2 px-4 py-2 border-r border-border/20 bg-background/50">
-                <span className="text-[9px] font-mono text-muted-foreground/50">
+                <span className="text-[10px] font-mono text-muted-foreground/50">
                   {FILE_ICONS[activeFileData.language]}
                 </span>
                 <span className="text-[10px] font-mono text-foreground/70">{activeFileData.name}</span>
               </div>
-              <span className="ml-auto pr-4 text-[8px] font-mono text-muted-foreground/30">
+              <span className="ml-auto pr-4 text-[10px] font-mono text-muted-foreground/30">
                 {activeFileData.language.toUpperCase()} · {lineCount.toLocaleString()} lines · utf-8
               </span>
             </div>
@@ -259,14 +259,14 @@ export default function CodeViewPage({ params }: Props) {
                   aria-hidden="true"
                 >
                   {activeFileData.content.split('\n').map((_, i) => (
-                    <div key={i} className="text-[11px] font-mono text-muted-foreground/20 leading-5 h-5">
+                    <div key={i} className="text-[14px] font-mono text-muted-foreground/20 leading-5 h-5">
                       {i + 1}
                     </div>
                   ))}
                 </div>
                 {/* Code content */}
                 <pre
-                  className="flex-1 px-6 py-5 text-[11px] font-mono leading-5 overflow-x-auto text-foreground/80 whitespace-pre m-0"
+                  className="flex-1 px-6 py-5 text-[14px] font-mono leading-5 overflow-x-auto text-foreground/80 whitespace-pre m-0"
                   dangerouslySetInnerHTML={{
                     __html: highlight(activeFileData.content, activeFileData.language),
                   }}

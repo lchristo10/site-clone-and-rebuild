@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server';
 import { getJob, updateJob, updatePhase, upsertPage } from '@/lib/job-store';
 import { extractPage } from '@/lib/firecrawl';
-import { analyzeDesignTokens, generateAeoContent, auditAeoScore, generateLayoutCss } from '@/lib/gemini';
-import { generateSitePlan } from '@/lib/site-planner';
+import { analyzeDesignTokens, generateAeoContent, generateAeoStrategy, auditAeoScore, generateLayoutCss, normalizeMarkdownToAuditHtml } from '@/lib/gemini';
+import { generateSitePlan, computeOwnershipMap } from '@/lib/site-planner';
 import { resolveFonts } from '@/lib/font-resolver';
 import { buildHtml } from '@/lib/synthesizer';
 import { extractBrandDna } from '@/lib/brand-dna';
@@ -299,7 +299,9 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
         emit({ phase: 'analyze', status: 'log', message: `✓ Primary color: ${tokens.colors.primary}` });
         emit({ phase: 'analyze', status: 'log', message: `✓ Heading font: ${tokens.typography.headingFont}` });
         emit({ phase: 'analyze', status: 'log', message: `✓ Layout: ${tokens.layout.navType} nav (${tokens.layout.navStyle}), ${tokens.layout.heroType} hero, ${tokens.layout.columnCount}-col` });
-        emit({ phase: 'analyze', status: 'log', message: `✓ Business: "${entityMap.businessName}" (${entityMap.industry})` });
+        emit({ phase: 'analyze', status: 'log', message: `✓ Business: "${entityMap.businessName}"` });
+        emit({ phase: 'analyze', status: 'log', message: `✓ Category: ${entityMap.businessCategory} › ${entityMap.businessType}` });
+        emit({ phase: 'analyze', status: 'log', message: `✓ Value Prop: ${entityMap.valueProposition}` });
         emit({ phase: 'analyze', status: 'log', message: `✓ Entities: ${entityMap.entities.join(', ')}` });
 
         updatePhase(jobId, 'analyze', { status: 'done', completedAt: Date.now(), tokens, entityMap });
@@ -341,6 +343,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
           pagePlannedSections?: PlannedSection[],
           allPages?: { slug: string; title: string }[],
           pageIntent?: string,
+          ownershipMap?: Record<string, string>,
         ): Promise<string> => {
           // DRAFT
           emit({ phase: 'draft', status: 'log', message: `[ DRAFT ] Generating content for: ${pageTitle}...` });
@@ -349,7 +352,8 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
             job.siteObjective, job.sitePersona,
             pagePlannedSections, // ← blueprint from site plan
             pageTitle,           // ← page identity for content isolation
-            pageIntent           // ← planner's stated purpose for this page
+            pageIntent,          // ← planner's stated purpose for this page
+            ownershipMap,        // ← Option A: cross-page content ownership
           );
           emit({ phase: 'draft', status: 'log', message: `✓ ${pageTitle}: "${aeoContent.h1}" — ${aeoContent.sections.length} sections` });
 
@@ -381,6 +385,37 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
           return built;
         };
 
+        // ── PHASE 3: STRATEGY — score original site + derive AEO strategy ─────
+        emit({ phase: 'strategy', status: 'running', message: '[ STRATEGY ] Assessing original site and developing AEO strategy...' });
+        let aeoStrategy;
+        try {
+          // Score the original site now (before synthesis) so the strategy
+          // can drive the site structure plan (Steps 4+5 in PIPELINE_PROCESS.md).
+          const originalAuditHtmlEarly = normalizeMarkdownToAuditHtml(
+            extracted.markdown ?? '',
+            extracted.meta?.description ?? '',
+          );
+          const originalScoreEarly = await auditAeoScore(originalAuditHtmlEarly, navPages.map(p => p.title)).catch(() => null);
+          if (originalScoreEarly) {
+            updateJob(jobId, { originalScore: originalScoreEarly });
+            emit({ phase: 'strategy', status: 'log', message: `✓ Original site AEO score: ${originalScoreEarly.overall}/100` });
+            emit({ phase: 'strategy', status: 'log', message: `  Content: ${originalScoreEarly.content_structure} | E-E-A-T: ${originalScoreEarly.eeat} | Technical: ${originalScoreEarly.technical} | Entity: ${originalScoreEarly.entity_alignment}` });
+
+            aeoStrategy = await generateAeoStrategy(originalScoreEarly, entityMap);
+            updateJob(jobId, { aeoStrategy });
+            emit({ phase: 'strategy', status: 'log', message: `✓ Focus areas: ${aeoStrategy.focusAreas.join(', ')}` });
+            emit({ phase: 'strategy', status: 'log', message: `✓ Priority sections: ${Object.entries(aeoStrategy.sectionPriorities).filter(([, v]) => v === 'critical').map(([k]) => k).join(', ')} (critical)` });
+            aeoStrategy.contentGuidance.forEach(g =>
+              emit({ phase: 'strategy', status: 'log', message: `  · ${g}` })
+            );
+          } else {
+            emit({ phase: 'strategy', status: 'log', message: '⚠ Could not score original site — strategy will use defaults' });
+          }
+          emit({ phase: 'strategy', status: 'done', message: '[ STRATEGY ] AEO strategy complete.', data: { aeoStrategy } });
+        } catch (stratErr) {
+          emit({ phase: 'strategy', status: 'log', message: `⚠ Strategy phase error: ${stratErr instanceof Error ? stratErr.message : 'unknown'} — continuing` });
+        }
+
         // ── PHASE 2.5: PLAN ───────────────────────────────────────────────────
         emit({ phase: 'plan', status: 'running', message: '[ PLAN ] Generating AEO site structure blueprint...' });
         let sitePlan;
@@ -390,6 +425,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
             job.siteObjective,
             job.sitePersona,
             navPages,
+            aeoStrategy,  // ← Step 5 feeds Step 6
           );
           updateJob(jobId, { sitePlan });
           emit({ phase: 'plan', status: 'log', message: `✓ Site plan: ${sitePlan.pages.length} page(s), ${sitePlan.pages.reduce((t, p) => t + p.sections.length, 0)} total sections` });
@@ -401,6 +437,12 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
         } catch (planErr) {
           emit({ phase: 'plan', status: 'log', message: `⚠ Site plan failed — falling back to free-form generation: ${planErr instanceof Error ? planErr.message : 'unknown'}` });
           emit({ phase: 'plan', status: 'done', message: '[ PLAN ] Skipped (using free-form fallback).' });
+        }
+
+        // Option A: compute cross-page ownership map from the plan
+        const ownershipMap: Record<string, string> = sitePlan ? computeOwnershipMap(sitePlan) : {};
+        if (Object.keys(ownershipMap).length > 0) {
+          emit({ phase: 'plan', status: 'log', message: `✓ Ownership map: ${Object.entries(ownershipMap).map(([t, p]) => `${t}→${p}`).join(', ')}` });
         }
 
         // ── PHASE 3+4: HOMEPAGE ───────────────────────────────────────────────
@@ -436,6 +478,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
           homePlan?.sections,
           allSitePagesForNav,
           homePlan?.intent,
+          ownershipMap,
         );
 
         // buildPage already calls upsertPage with aeoContent — just sync remaining phases
@@ -516,6 +559,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
                 pagePlan?.sections,
                 allSitePagesForNav,
                 pagePlan?.intent,
+                ownershipMap,
               );
 
               emit({ phase: 'system', status: 'log', message: `  ✓ ${page.title} built: ${pageHtml.length} chars` });
@@ -539,18 +583,31 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
 
         const crawledTitles = navPages.map(p => p.title);
 
-        // Run the rebuilt-site audit + original-site audit in parallel
-        const originalMarkdown = extracted.markdown;
-        const [score, originalScore] = await Promise.all([
-          auditAeoScore(homeHtml, crawledTitles),
-          auditAeoScore(
-            `<html><body>${originalMarkdown.substring(0, 8000)}</body></html>`,
-            crawledTitles
-          ).catch(() => null),
-        ]);
+        // Caching: skip re-audit if scores are already stored for this job
+        let score: import('@/lib/types').AeoScore;
+        let originalScore: import('@/lib/types').AeoScore | null = null;
 
-        if (originalScore) {
-          updateJob(jobId, { originalScore });
+        const cachedScore = getJob(jobId)?.phases.audit.score;
+        if (cachedScore) {
+          score = cachedScore;
+          originalScore = getJob(jobId)?.originalScore ?? null;
+          emit({ phase: 'audit', status: 'log', message: '✓ AEO scores loaded from cache — skipping re-audit' });
+        } else {
+          // Normalize original markdown → semantic HTML for a fair, comparable audit
+          const originalAuditHtml = normalizeMarkdownToAuditHtml(
+            extracted.markdown.substring(0, 15000),
+            extracted.meta.description || '',
+          );
+
+          // Run rebuilt-site audit + original-site audit in parallel
+          const [rebuiltScore, maybeOriginalScore] = await Promise.all([
+            auditAeoScore(homeHtml, crawledTitles),
+            auditAeoScore(originalAuditHtml, crawledTitles).catch(() => null),
+          ]);
+
+          score = rebuiltScore;
+          originalScore = maybeOriginalScore;
+          if (originalScore) updateJob(jobId, { originalScore });
         }
 
         emit({ phase: 'audit', status: 'log', message: `✓ Overall AEO Score: ${score.overall}/100` });
@@ -563,6 +620,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
         updateJob(jobId, { status: 'done' });
         emit({ phase: 'audit', status: 'done', message: '[ AUDIT ] Complete.', data: { score, originalScore } });
         emit({ phase: 'system', status: 'done', message: `▶ ALIAS COMPILER complete. ${totalPages} page(s) ready.` });
+
 
 
       } catch (err) {

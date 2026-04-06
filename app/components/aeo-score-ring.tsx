@@ -5,6 +5,7 @@ interface ScoreRingProps {
   score: number;
   label: string;
   size?: 'sm' | 'md' | 'lg';
+  tooltip?: string;
 }
 
 function getColor(score: number): string {
@@ -21,7 +22,7 @@ function getLabel(score: number): string {
   return 'Critical';
 }
 
-export function AeoScoreRing({ score, label, size = 'md' }: ScoreRingProps) {
+export function AeoScoreRing({ score, label, size = 'md', tooltip }: ScoreRingProps) {
   const [displayed, setDisplayed] = useState(0);
 
   useEffect(() => {
@@ -88,13 +89,60 @@ export function AeoScoreRing({ score, label, size = 'md' }: ScoreRingProps) {
           {displayed}
         </text>
       </svg>
-      <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground text-center">{label}</p>
+
+      {/* Label — with optional tooltip */}
+      {tooltip ? (
+        <div className="relative group flex flex-col items-center">
+          <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground text-center cursor-help border-b border-dashed border-muted-foreground/30 leading-tight pb-px">
+            {label}
+          </p>
+          {/* Tooltip bubble */}
+          <div
+            className="
+              pointer-events-none absolute bottom-full mb-2 left-1/2 -translate-x-1/2
+              w-52 px-3 py-2 rounded-lg
+              bg-card border border-border
+              shadow-lg shadow-black/20
+              opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100
+              transition-all duration-150 ease-out
+              z-50
+            "
+          >
+            {/* Arrow */}
+            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px w-0 h-0
+              border-l-[5px] border-l-transparent
+              border-r-[5px] border-r-transparent
+              border-t-[5px] border-t-border" />
+            <p className="text-[10px] font-mono text-foreground/80 leading-relaxed text-center">
+              {tooltip}
+            </p>
+          </div>
+        </div>
+      ) : (
+        <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground text-center">
+          {label}
+        </p>
+      )}
+
       {size === 'lg' && (
-        <p className="text-xs font-mono tracking-wide mt-0.5" style={{ color }}>{getLabel(score)}</p>
+        <p className="text-sm font-mono tracking-wide mt-0.5" style={{ color }}>{getLabel(score)}</p>
       )}
     </div>
   );
 }
+
+// ── Tooltip copy for each AEO dimension ──────────────────────────────────────
+
+const AEO_TOOLTIPS: Record<string, string> = {
+  'Content Structure':
+    'How well your page is structured for AI to extract answers — clear headings, bullet lists, a direct opening summary, and multiple distinct sections.',
+  'E-E-A-T':
+    'Experience, Expertise, Authoritativeness & Trustworthiness. Named authors, credentials, real stats, customer reviews, and trust signals like certifications.',
+  'Technical':
+    'The technical foundations AI crawlers rely on — structured data (JSON-LD schema), semantic HTML landmarks, a single H1, a meta description, and readable static content.',
+  'Entity Align':
+    'How clearly the page signals what this business is and who it serves — brand name in the headline, primary service described early, specific terminology, and local/audience targeting.',
+};
 
 interface AeoScoreGridProps {
   overall: number;
@@ -118,10 +166,10 @@ export function AeoScoreGrid({ overall, content_structure, eeat, technical, enti
 
         {/* Sub-scores — 2×2 grid */}
         <div className="w-full grid grid-cols-2 gap-4">
-          <AeoScoreRing score={content_structure} label="Content Structure" size="sm" />
-          <AeoScoreRing score={eeat} label="E-E-A-T" size="sm" />
-          <AeoScoreRing score={technical} label="Technical" size="sm" />
-          <AeoScoreRing score={entity_alignment} label="Entity Align" size="sm" />
+          <AeoScoreRing score={content_structure} label="Content Structure" size="sm" tooltip={AEO_TOOLTIPS['Content Structure']} />
+          <AeoScoreRing score={eeat}              label="E-E-A-T"           size="sm" tooltip={AEO_TOOLTIPS['E-E-A-T']} />
+          <AeoScoreRing score={technical}         label="Technical"         size="sm" tooltip={AEO_TOOLTIPS['Technical']} />
+          <AeoScoreRing score={entity_alignment}  label="Entity Align"      size="sm" tooltip={AEO_TOOLTIPS['Entity Align']} />
         </div>
       </div>
     );
@@ -139,13 +187,11 @@ export function AeoScoreGrid({ overall, content_structure, eeat, technical, enti
 
       {/* Sub-scores — 2×2 right */}
       <div className="flex-1 grid grid-cols-2 gap-x-2 gap-y-3">
-        <AeoScoreRing score={content_structure} label="Content Structure" size="sm" />
-        <AeoScoreRing score={eeat} label="E-E-A-T" size="sm" />
-        <AeoScoreRing score={technical} label="Technical" size="sm" />
-        <AeoScoreRing score={entity_alignment} label="Entity Align" size="sm" />
+        <AeoScoreRing score={content_structure} label="Content Structure" size="sm" tooltip={AEO_TOOLTIPS['Content Structure']} />
+        <AeoScoreRing score={eeat}              label="E-E-A-T"           size="sm" tooltip={AEO_TOOLTIPS['E-E-A-T']} />
+        <AeoScoreRing score={technical}         label="Technical"         size="sm" tooltip={AEO_TOOLTIPS['Technical']} />
+        <AeoScoreRing score={entity_alignment}  label="Entity Align"      size="sm" tooltip={AEO_TOOLTIPS['Entity Align']} />
       </div>
     </div>
   );
 }
-
-

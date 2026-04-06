@@ -74,7 +74,14 @@ export interface BrandDNA {
 
 export interface EntityMap {
   businessName: string;
+  /** @deprecated use businessCategory + businessType instead */
   industry: string;
+  /** Broad category: "service" | "product" | "ecommerce" | "saas" | "marketplace" | "non-profit" */
+  businessCategory: string;
+  /** Specific type within category: "hair salon" | "yoga studio" | "accounting firm" etc. */
+  businessType: string;
+  /** Two-sentence value proposition distinguishing this business from others of the same type */
+  valueProposition: string;
   primaryService: string;
   entities: string[];
   targetAudience: string;
@@ -98,6 +105,37 @@ export interface AeoSection {
   listItems?: string[];
 }
 
+/**
+ * Flat binary checklist returned by Gemini (temperature 0.2).
+ * Scores are computed deterministically in TypeScript from these fields.
+ */
+export interface AeoChecklist {
+  // Content Structure
+  cs_hasH1: boolean;
+  cs_hasQuestionDrivenHeadings: boolean;
+  cs_hasListsOrTables: boolean;
+  cs_hasAnswerCapsule: boolean;
+  cs_hasMultipleSections: boolean;
+  // E-E-A-T
+  ee_hasAboutOrAuthorship: boolean;
+  ee_hasNamedPeopleOrCredentials: boolean;
+  ee_hasTestimonialsOrReviews: boolean;
+  ee_hasSpecificStats: boolean;
+  ee_hasCertificationsOrTrust: boolean;
+  // Technical
+  tc_hasJsonLd: boolean;
+  tc_hasSemanticHtml: boolean;
+  tc_hasSingleH1: boolean;
+  tc_hasMetaDescription: boolean;
+  tc_isReadableWithoutJs: boolean;
+  // Entity Alignment
+  ea_businessNameInH1OrFirstPara: boolean;
+  ea_primaryServiceNamed: boolean;
+  ea_usesSpecificTerminology: boolean;
+  ea_hasInternalLinks: boolean;
+  ea_hasGeographicOrAudienceTargeting: boolean;
+}
+
 export interface AeoScore {
   overall: number;
   content_structure: number;
@@ -108,6 +146,8 @@ export interface AeoScore {
   recommendations: string[];
   canSummarizeIn2Sentences: boolean;
   missingPageSuggestions: string[];
+  /** Binary checklist used to compute the scores — present on all new audits. */
+  checklist?: AeoChecklist;
 }
 
 // ── AEO Site Structure (Tactical Grid) ───────────────────────────────────────
@@ -173,6 +213,26 @@ export interface StrategistReport {
   executiveSummary: string;
 }
 
+// ── AEO Strategy (Step 5) ─────────────────────────────────────────────────────
+
+/**
+ * Structured strategy derived from the AEO assessment of the original site.
+ * Bridges the gap between the raw score and the site structure plan.
+ */
+export interface AeoStrategy {
+  /** The 1-2 lowest-scoring categories that will drive structural priorities */
+  focusAreas: string[];
+  /**
+   * Section types the site structure MUST include, keyed by importance.
+   * e.g. { faq: 'critical', testimonials: 'important', about: 'critical' }
+   */
+  sectionPriorities: Record<string, 'critical' | 'important' | 'optional'>;
+  /** Specific copy and content guidance derived from the checklist gaps */
+  contentGuidance: string[];
+  /** One-paragraph rationale explaining the strategy for this specific business type */
+  rationale: string;
+}
+
 export interface PhaseResult {
   status: PhaseStatus;
   startedAt?: number;
@@ -207,8 +267,12 @@ export interface JobState {
   sitePlan?: SitePlan;
   /** AEO score of the original scraped site (before rebuild) */
   originalScore?: AeoScore;
+  /** AEO strategy derived from the original site's score — drives site structure */
+  aeoStrategy?: AeoStrategy;
   /** AI Strategist report — generated on demand after build */
   strategistReport?: StrategistReport;
+  /** Whether the brand theme has been committed to all page HTML (via apply-brand) */
+  brandThemeApplied?: boolean;
   phases: {
     extract: PhaseResult & {
       screenshotUrl?: string;
@@ -226,7 +290,7 @@ export interface JobState {
 }
 
 export interface StreamEvent {
-  phase: 'extract' | 'analyze' | 'plan' | 'draft' | 'synthesize' | 'audit' | 'system';
+  phase: 'extract' | 'analyze' | 'strategy' | 'plan' | 'draft' | 'synthesize' | 'audit' | 'system';
   status: PhaseStatus | 'log';
   message: string;
   data?: unknown;

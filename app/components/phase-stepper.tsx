@@ -41,7 +41,7 @@ export function PhaseStepper({ phases }: PhaseStepperProps) {
         return (
           <div key={phase.id} className="flex items-center flex-1 min-w-0">
             <div className="flex flex-col items-center gap-1 flex-1 min-w-0">
-              <div className={`w-8 h-8 rounded border flex items-center justify-center text-xs font-mono font-bold transition-all duration-500 ${statusColor} ${bgColor} ${status === 'running' ? 'animate-pulse-glow' : ''}`}>
+              <div className={`w-8 h-8 rounded border flex items-center justify-center text-sm font-mono font-bold transition-all duration-500 ${statusColor} ${bgColor} ${status === 'running' ? 'animate-pulse-glow' : ''}`}>
                 {status === 'running' ? (
                   <span className="animate-terminal-blink">{icon}</span>
                 ) : icon}
@@ -51,7 +51,7 @@ export function PhaseStepper({ phases }: PhaseStepperProps) {
               }`}>
                 {phase.shortLabel}
               </span>
-              <span className={`text-[9px] font-mono uppercase tracking-wide block sm:hidden transition-colors duration-300 ${
+              <span className={`text-[10px] font-mono uppercase tracking-wide block sm:hidden transition-colors duration-300 ${
                 status === 'pending' ? 'text-muted-foreground/40' : statusColor.split(' ')[0]
               }`}>
                 {phase.shortLabel}

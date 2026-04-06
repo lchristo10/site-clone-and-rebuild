@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import {
+  AeoStrategy,
   EntityMap,
   SiteObjective,
   SitePersona,
@@ -21,6 +22,7 @@ export async function generateSitePlan(
   objective: SiteObjective,
   persona: SitePersona | undefined,
   discoveredPages: { slug: string; title: string; url: string }[],
+  aeoStrategy?: AeoStrategy,
 ): Promise<SitePlan> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || apiKey === 'your_gemini_api_key_here') {
@@ -145,11 +147,18 @@ PAGES TO CREATE (informational + deep-hub):
 4. Contact (slug: "contact") — inquiry form, location, availability`,
   };
 
+  // ── Strategy-derived section priority overrides ────────────────────────────
+  const strategyPriorityBlock = aeoStrategy
+    ? `\nAEO STRATEGY — SECTION PRIORITIES (derived from original site assessment):\nFocus areas identified from original site gaps: ${aeoStrategy.focusAreas.join(', ')}\nThe following section types MUST be assigned the stated importance level — this overrides your defaults:\n${Object.entries(aeoStrategy.sectionPriorities).map(([k, v]) => `  - "${k}": "${v}"`).join('\n')}\nContent guidance (apply to section rationale and label writing):\n${aeoStrategy.contentGuidance.slice(0, 5).map(g => `  · ${g}`).join('\n')}\nStrategy rationale: ${aeoStrategy.rationale}`
+    : '';
+
   const prompt = `You are an AEO (Answer Engine Optimization) strategist. Your job is to design the optimal site structure for a rebuilt website — one that maximises performance for AI answer engines like Perplexity, Google AI Overviews, and Claude.
 
 BUSINESS CONTEXT:
 - Business: ${entityMap.businessName}
-- Industry: ${entityMap.industry}
+- Business Category: ${entityMap.businessCategory ?? entityMap.industry}
+- Business Type: ${entityMap.businessType ?? entityMap.industry}
+- Value Proposition: ${entityMap.valueProposition ?? 'Not specified'}
 - Primary Service: ${entityMap.primaryService}
 - Key Entities: ${entityMap.entities.join(', ')}
 - Target Audience: ${entityMap.targetAudience}
@@ -160,6 +169,15 @@ ${architectureNote}
 ${isDeepHub ? (deepHubPageGuide[objective] ?? deepHubPageGuide['other']) : ''}
 
 ${aeoRules}
+${strategyPriorityBlock}
+
+SERVICE SITE STRUCTURE PRINCIPLES — apply to every page:
+- Flat, intuitive hierarchy: clean URL slugs, hub-and-spoke model (Home links to all key sections; each sub-page links back to related pages).
+- Core pages (Home, About, Services) MUST lead with a direct 40-60 word answer capsule stating what the business does and for whom.
+- FAQ content must be structured as discrete Q&A pairs — each question as a heading, each answer in 40-60 words — highly favoured for AI zero-click extraction.
+- Every page must include at least one machine-readable list (bullet points, numbered process steps, or a comparison table).
+- Where architecture permits (deep-hub), plan topic clusters: a Services pillar page connected via internal links to specific service sub-topics.
+- For local service businesses: include geographic or audience targeting in the Hero section (e.g. "in [City]" or "for [Audience]").
 
 SECTION TYPES AVAILABLE:
 hero | features | services | about | testimonials | faq | cta | generic
@@ -175,19 +193,27 @@ RATIONALE RULES:
 
 OUTPUT:
 ${isDeepHub
-  ? `- Generate ALL pages listed in PAGES TO CREATE above. Adapt the slugs/titles to fit this specific business.
-- Each page MUST have a distinct purpose and answer different user questions.
-- Home MUST be the first page. All other pages should be logically ordered.
-- Each page's sections should be ordered from most to least AEO-critical.`
-  : `- Return exactly the pages from the discovered list, in the same order, with optimal sections for each.
-- Do NOT invent new pages — only plan sections for the pages provided.
-- Each page's sections should be ordered from most to least AEO-critical.`}
+  ? `- Generate ALL pages listed in PAGES TO CREATE above. Adapt the slugs/titles to fit this specific business.\n- Each page MUST have a distinct purpose and answer different user questions.\n- Home MUST be the first page. All other pages should be logically ordered.\n- Each page's sections should be ordered from most to least AEO-critical.`
+  : `- Return exactly the pages from the discovered list, in the same order, with optimal sections for each.\n- Do NOT invent new pages — only plan sections for the pages provided.\n- Each page's sections should be ordered from most to least AEO-critical.`}
 
 STRICT PLANNING CONSTRAINTS (non-negotiable):
 - NEVER create a standalone FAQ page. FAQ content belongs as a section (type="faq") within the most relevant page (e.g. Services, About).
 - Use the MINIMUM number of pages needed to communicate the business clearly. Do not add pages for the sake of completeness.
 - Use the MINIMUM number of sections per page needed for AEO impact. Prefer 3-5 focused sections over 7-8 diluted ones.
 - Every section must earn its place: if a section doesn't directly answer a user question or signal E-E-A-T, omit it.
+
+SECTION TYPE OWNERSHIP RULES (single-owner — non-negotiable):
+Each of the following section types must appear on AT MOST ONE page across the entire site.
+If you assign it to one page, do NOT assign the same type to any other page:
+- "testimonials" — one page only (usually Home or About, not both).
+- "about" — one page only (the About page if it exists; otherwise Home). Sub-pages must NOT get a second "about" section.
+- "faq" — one page only (the most relevant page, e.g. Services or About).
+- "services" — one page only (the Services page if it exists; otherwise Home).
+- "features" — one page only (the page where a "How It Works" or feature list has most AEO impact).
+EXCEPTIONS (these may appear on every page):
+- "hero" — every page gets a hero, but ONLY the Home page hero should be full-screen/large. All other pages must use a compact hero (2-3 lines, a sub-heading that names the page's purpose).
+- "cta" — every page may close with a cta section. The copy MUST differ per page (page-specific action, not a copy-paste of the Home CTA).
+- "generic" — may appear anywhere when no other type fits.
 
 PAGE TITLE RULES (CRITICAL):
 - Page titles must be SHORT and GENERIC — 1-2 words maximum.
@@ -198,8 +224,8 @@ PAGE TITLE RULES (CRITICAL):
 - Use the slug as a guide: slug="services" → title="Services"
 - The title is a navigation label, not an SEO heading.`;
 
-
   const result = await model.generateContent(prompt);
+
 
   const raw = JSON.parse(result.response.text()) as { pages: Array<{
     slug: string; title: string; intent: string;
@@ -263,4 +289,35 @@ PAGE TITLE RULES (CRITICAL):
   }));
 
   return { generatedAt: Date.now(), pages: trimmedPages };
+}
+
+// ─── Option A: Cross-page ownership map ───────────────────────────────────────
+
+/**
+ * Section types where duplication across pages degrades quality.
+ * "hero" and "cta" are excluded — they're intentionally present on every page.
+ */
+const OWNED_SECTION_TYPES = new Set([
+  'testimonials',
+  'about',
+  'faq',
+  'services',
+  'features',
+]);
+
+/**
+ * Derives a map of { sectionType → owning page title } from a completed site plan.
+ * The first page in the plan that uses a given section type "owns" it.
+ * Used to inject "do not repeat" rules into each page's content generation call.
+ */
+export function computeOwnershipMap(plan: SitePlan): Record<string, string> {
+  const ownership: Record<string, string> = {};
+  for (const page of plan.pages) {
+    for (const section of page.sections) {
+      if (OWNED_SECTION_TYPES.has(section.type) && !(section.type in ownership)) {
+        ownership[section.type] = page.title;
+      }
+    }
+  }
+  return ownership;
 }

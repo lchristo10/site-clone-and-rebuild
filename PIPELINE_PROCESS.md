@@ -1,0 +1,8 @@
+1. User enters URL
+2. User inputs priorities: website primary objective and persona (5 x duels)
+3. Details are extracted from URL: (a) Brand Name, (b) Business Category (Service, Product, etc.), (c) Business Type (hair salon, barber, yoga studio, pilates studio, dentist, gym etc.), (d) Value Proposition (two-sentence summary of what makes the business unique), (e) Brand Theme (fonts, colour palette)
+4. Assess AEO Performance: Assess the website for the URL the user entered against the AEO_ASSESSMENT_CRITERIA.md file. Treat each criteria as pass/fail and compute the score per category based on the weighting of each criterion.
+5. Develop AEO Strategy: Develop an AEO strategy specific to the extracted business category and business type, referring to the AEO_CHECKLIST.md file.
+6. Develop Site Structure: Develop an optimal site structure, based on the AEO strategy and the business category and business type, referring to the SERVICE_SITE_STRUCTURE.md and AEO_CHECKLIST.md files. This should inform the tactical grid content: pages, and sections for each page. Leverage the existing logic to ensure there is no duplication of section content across pages.
+7. Develop Site Content: Develop the site content, including design of each section and generation of copy per section based on the AEO_COPY_GUIDELINES.md file.
+8. At this point, the user should be able to preview the site and the site structure (tactical grid). They can then choose to apply the brand theme, based on the extracted font and colours from step 3.

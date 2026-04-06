@@ -24,10 +24,10 @@ export default async function ClonePage({ params }: Props) {
           <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-alias-green">COMPILER</span>
         </Link>
         <div className="flex items-center gap-3">
-          <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-muted-foreground/40 hidden sm:block">
+          <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground/40 hidden sm:block">
             Pipeline
           </span>
-          <span className="text-[9px] font-mono text-muted-foreground/60 bg-card border border-border px-2 py-1 rounded">
+          <span className="text-[10px] font-mono text-muted-foreground/60 bg-card border border-border px-2 py-1 rounded">
             {jobId.slice(0, 8)}
           </span>
         </div>

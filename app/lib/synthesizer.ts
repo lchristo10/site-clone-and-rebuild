@@ -276,7 +276,7 @@ function cssFromTokens(tokens: DesignTokens, brandDna?: BrandDNA): string {
       display: inline-flex;
       align-items: center;
       gap: 0.5rem;
-      background: var(--c-primary);
+      background: var(--c-accent);
       color: var(--c-surface) !important;
       text-decoration: none !important;
       padding: 0.55rem 1.25rem;
@@ -288,7 +288,7 @@ function cssFromTokens(tokens: DesignTokens, brandDna?: BrandDNA): string {
     .site-nav__cta:hover {
       opacity: 1 !important;
       transform: translateY(-1px);
-      box-shadow: 0 4px 12px color-mix(in srgb, var(--c-primary) 35%, transparent);
+      box-shadow: 0 4px 12px color-mix(in srgb, var(--c-accent) 35%, transparent);
     }
 
     /* ─── Hero ──────────────────────────────────────────────────── */
@@ -323,7 +323,7 @@ function cssFromTokens(tokens: DesignTokens, brandDna?: BrandDNA): string {
     }
     .hero-section h1 em {
       font-style: normal;
-      color: var(--c-primary);
+      color: var(--c-accent);
     }
     .hero-section .hero-sub {
       font-size: clamp(1rem, 1.8vw, 1.2rem);
@@ -365,7 +365,7 @@ function cssFromTokens(tokens: DesignTokens, brandDna?: BrandDNA): string {
       font-weight: 700;
       letter-spacing: 0.1em;
       text-transform: uppercase;
-      color: var(--c-primary);
+      color: var(--c-accent);
       margin-bottom: 0.6rem;
     }
 
@@ -391,13 +391,13 @@ function cssFromTokens(tokens: DesignTokens, brandDna?: BrandDNA): string {
       width: 48px;
       height: 48px;
       border-radius: var(--radius-md);
-      background: color-mix(in srgb, var(--c-primary) 10%, transparent);
-      border: 1px solid color-mix(in srgb, var(--c-primary) 18%, transparent);
+      background: color-mix(in srgb, var(--c-accent) 10%, transparent);
+      border: 1px solid color-mix(in srgb, var(--c-accent) 20%, transparent);
       display: flex;
       align-items: center;
       justify-content: center;
       margin-bottom: 1.25rem;
-      color: var(--c-primary);
+      color: var(--c-accent);
       flex-shrink: 0;
     }
     .feature-card__icon svg {
@@ -536,7 +536,7 @@ function cssFromTokens(tokens: DesignTokens, brandDna?: BrandDNA): string {
       font-family: var(--f-heading);
       font-size: 1.75rem;
       font-weight: 800;
-      color: var(--c-primary);
+      color: var(--c-accent);
       line-height: 1;
     }
     .stat-item__label {
@@ -600,13 +600,13 @@ function cssFromTokens(tokens: DesignTokens, brandDna?: BrandDNA): string {
       border: none;
     }
     .btn-primary {
-      background: var(--c-primary);
+      background: var(--c-accent);
       color: var(--c-surface) !important;
-      box-shadow: 0 2px 8px color-mix(in srgb, var(--c-primary) 30%, transparent);
+      box-shadow: 0 2px 8px color-mix(in srgb, var(--c-accent) 30%, transparent);
     }
     .btn-primary:hover {
       transform: translateY(-2px);
-      box-shadow: 0 6px 20px color-mix(in srgb, var(--c-primary) 40%, transparent);
+      box-shadow: 0 6px 20px color-mix(in srgb, var(--c-accent) 40%, transparent);
       opacity: 1 !important;
     }
     .btn-outline {
@@ -646,7 +646,7 @@ function cssFromTokens(tokens: DesignTokens, brandDna?: BrandDNA): string {
     }
     .checklist li::before {
       content: '✓';
-      color: var(--c-primary);
+      color: var(--c-accent);
       font-weight: 700;
       flex-shrink: 0;
       margin-top: 0.05em;
@@ -1528,8 +1528,11 @@ export function buildHtml(
   if (navStyle === 'stacked-display') navVariantCss = stackedNavCss();
   else if (navStyle === 'minimal') navVariantCss = minimalNavCss();
 
+  // Monochrome is automatically disabled when a brandDna is present — the brand
+  // palette IS the colour system and monochrome would overwrite it entirely.
+  const applyMonochrome = monochrome && !brandDna;
   const css = cssFromTokens(tokens, brandDna) + navVariantCss
-    + (monochrome ? '\n\n    ' + monochromeOverrideCss() : '');
+    + (applyMonochrome ? '\n\n    ' + monochromeOverrideCss() : '');
 
   const jsonLdBlocks = aeoContent.jsonLd.map(schema =>
     `  <script type="application/ld+json">\n${JSON.stringify(schema, null, 2)}\n  </script>`
@@ -1606,6 +1609,7 @@ export function buildHtml(
   }
 
   // postMessage bridge: nav link clicks notify the parent preview to switch pages.
+  // Also handles INJECT_CSS (live brand preview) and CLEAR_CSS (undo).
   // Falls back to URL navigation when viewed standalone (full-view mode).
   const iframeNavScript = isMultiPage ? `
   <script>
@@ -1624,7 +1628,56 @@ export function buildHtml(
         window.location.href = url.toString();
       }
     });
-  </script>` : '';
+    // Brand theme live preview — injected by the ALIAS preview panel
+    window.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'ALIAS_INJECT_CSS') {
+        var el = document.getElementById('__alias-brand-override');
+        if (!el) { el = document.createElement('style'); el.id = '__alias-brand-override'; document.head.appendChild(el); }
+        el.textContent = e.data.css || '';
+      }
+      if (e.data && e.data.type === 'ALIAS_CLEAR_CSS') {
+        var el = document.getElementById('__alias-brand-override');
+        if (el) el.remove();
+      }
+      if (e.data && e.data.type === 'ALIAS_INJECT_FONT') {
+        var existing = document.getElementById('__alias-brand-font');
+        if (existing) existing.remove();
+        if (e.data.url) {
+          var link = document.createElement('link');
+          link.id = '__alias-brand-font';
+          link.rel = 'stylesheet';
+          link.href = e.data.url;
+          document.head.appendChild(link);
+        }
+      }
+    });
+  </script>` : `
+  <script>
+    window.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'ALIAS_INJECT_CSS') {
+        var el = document.getElementById('__alias-brand-override');
+        if (!el) { el = document.createElement('style'); el.id = '__alias-brand-override'; document.head.appendChild(el); }
+        el.textContent = e.data.css || '';
+      }
+      if (e.data && e.data.type === 'ALIAS_CLEAR_CSS') {
+        var el = document.getElementById('__alias-brand-override');
+        if (el) el.remove();
+      }
+      if (e.data && e.data.type === 'ALIAS_INJECT_FONT') {
+        var existing = document.getElementById('__alias-brand-font');
+        if (existing) existing.remove();
+        if (e.data.url) {
+          var link = document.createElement('link');
+          link.id = '__alias-brand-font';
+          link.rel = 'stylesheet';
+          link.href = e.data.url;
+          document.head.appendChild(link);
+        }
+      }
+    });
+  </script>`;
+
+
 
   // Option 3: Render nav HTML based on navStyle
   const navHtml = navStyle === 'stacked-display'

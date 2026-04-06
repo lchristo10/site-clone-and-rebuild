@@ -53,23 +53,23 @@ function CellEditor({ section, onSave, onDelete, onClose, status, error }: CellE
     <div className="absolute z-30 top-full left-0 mt-1 w-72 rounded-xl border border-border/60 bg-card shadow-2xl backdrop-blur-md p-4 space-y-3">
       {/* Label */}
       <div>
-        <p className="text-[8px] font-mono uppercase tracking-[0.15em] text-muted-foreground/50 mb-1">Label (2-4 words)</p>
+        <p className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground/50 mb-1">Label (2-4 words)</p>
         <input
           value={label}
           onChange={e => setLabel(e.target.value)}
           maxLength={40}
-          className="w-full bg-background border border-border/40 rounded px-2 py-1.5 text-[11px] font-mono text-foreground focus:outline-none focus:border-alias-green/40"
+          className="w-full bg-background border border-border/40 rounded px-2 py-1.5 text-[14px] font-mono text-foreground focus:outline-none focus:border-alias-green/40"
         />
       </div>
 
       {/* Section type */}
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <p className="text-[8px] font-mono uppercase tracking-[0.15em] text-muted-foreground/50 mb-1">Type</p>
+          <p className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground/50 mb-1">Type</p>
           <select
             value={type}
             onChange={e => setType(e.target.value as PlannedSection['type'])}
-            className="w-full bg-background border border-border/40 rounded px-2 py-1.5 text-[11px] font-mono text-foreground focus:outline-none focus:border-alias-green/40"
+            className="w-full bg-background border border-border/40 rounded px-2 py-1.5 text-[14px] font-mono text-foreground focus:outline-none focus:border-alias-green/40"
           >
             {SECTION_TYPES.map(t => (
               <option key={t} value={t}>{t}</option>
@@ -77,11 +77,11 @@ function CellEditor({ section, onSave, onDelete, onClose, status, error }: CellE
           </select>
         </div>
         <div>
-          <p className="text-[8px] font-mono uppercase tracking-[0.15em] text-muted-foreground/50 mb-1">AEO Importance</p>
+          <p className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground/50 mb-1">AEO Importance</p>
           <select
             value={importance}
             onChange={e => setImportance(e.target.value as AeoImportance)}
-            className="w-full bg-background border border-border/40 rounded px-2 py-1.5 text-[11px] font-mono text-foreground focus:outline-none focus:border-alias-green/40"
+            className="w-full bg-background border border-border/40 rounded px-2 py-1.5 text-[14px] font-mono text-foreground focus:outline-none focus:border-alias-green/40"
           >
             <option value="critical">Critical</option>
             <option value="important">Important</option>
@@ -92,7 +92,7 @@ function CellEditor({ section, onSave, onDelete, onClose, status, error }: CellE
 
       {/* Rationale */}
       <div>
-        <p className="text-[8px] font-mono uppercase tracking-[0.15em] text-muted-foreground/50 mb-1">AEO Rationale</p>
+        <p className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground/50 mb-1">AEO Rationale</p>
         <textarea
           value={rationale}
           onChange={e => setRationale(e.target.value)}
@@ -103,13 +103,13 @@ function CellEditor({ section, onSave, onDelete, onClose, status, error }: CellE
 
       {/* Status */}
       {status === 'rebuilding' && (
-        <p className="text-[9px] font-mono text-alias-amber animate-pulse">⟳ Rebuilding page…</p>
+        <p className="text-[10px] font-mono text-alias-amber animate-pulse">⟳ Rebuilding page…</p>
       )}
       {status === 'done' && (
-        <p className="text-[9px] font-mono text-alias-green">✓ Page rebuilt &amp; preview updated</p>
+        <p className="text-[10px] font-mono text-alias-green">✓ Page rebuilt &amp; preview updated</p>
       )}
       {status === 'error' && (
-        <p className="text-[9px] font-mono text-alias-red">✗ {error}</p>
+        <p className="text-[10px] font-mono text-alias-red">✗ {error}</p>
       )}
 
       {/* Actions */}
@@ -117,7 +117,7 @@ function CellEditor({ section, onSave, onDelete, onClose, status, error }: CellE
         <button
           onClick={() => onSave({ type, label, rationale, importance })}
           disabled={status === 'rebuilding' || !label.trim()}
-          className="flex-1 py-1.5 text-[9px] font-mono uppercase tracking-wider rounded border border-alias-green text-alias-green bg-alias-green/5 hover:bg-alias-green/15 disabled:opacity-40 transition-colors"
+          className="flex-1 py-1.5 text-[10px] font-mono uppercase tracking-wider rounded border border-alias-green text-alias-green bg-alias-green/5 hover:bg-alias-green/15 disabled:opacity-40 transition-colors"
         >
           {status === 'rebuilding' ? '⟳ Rebuilding…' : '◈ Save & Rebuild'}
         </button>
@@ -125,13 +125,13 @@ function CellEditor({ section, onSave, onDelete, onClose, status, error }: CellE
           onClick={onDelete}
           disabled={status === 'rebuilding'}
           title="Remove this section (will rebuild page)"
-          className="px-2.5 py-1.5 text-[9px] font-mono rounded border border-alias-red/30 text-alias-red/60 hover:text-alias-red hover:border-alias-red/60 disabled:opacity-40 transition-colors"
+          className="px-2.5 py-1.5 text-[10px] font-mono rounded border border-alias-red/30 text-alias-red/60 hover:text-alias-red hover:border-alias-red/60 disabled:opacity-40 transition-colors"
         >
           ✕
         </button>
         <button
           onClick={onClose}
-          className="px-2.5 py-1.5 text-[9px] font-mono rounded border border-border/40 text-muted-foreground/50 hover:text-foreground transition-colors"
+          className="px-2.5 py-1.5 text-[10px] font-mono rounded border border-border/40 text-muted-foreground/50 hover:text-foreground transition-colors"
         >
           ✕ Cancel
         </button>
@@ -196,7 +196,7 @@ function GridCell({ section, pageSlug, isOpen, onOpen, onClose, onUpdate, onDele
             <p className="text-[10px] font-mono font-semibold text-foreground/85 leading-snug truncate">
               {section.label}
             </p>
-            <p className="text-[8px] font-mono text-muted-foreground/50 capitalize mt-0.5">{section.type}</p>
+            <p className="text-[10px] font-mono text-muted-foreground/50 capitalize mt-0.5">{section.type}</p>
           </div>
         </div>
       </button>
@@ -239,8 +239,8 @@ function PageHeader({ page, canDelete, onDelete }: PageHeaderProps) {
     <div className="pb-2 border-b border-border/30 mb-2">
       <div className="flex items-start justify-between gap-1">
         <div>
-          <p className="text-[11px] font-mono font-semibold text-foreground/90 capitalize">{page.title}</p>
-          <p className="text-[8px] font-mono text-muted-foreground/50 mt-0.5">
+          <p className="text-[14px] font-mono font-semibold text-foreground/90 capitalize">{page.title}</p>
+          <p className="text-[10px] font-mono text-muted-foreground/50 mt-0.5">
             {criticalCount} critical · {page.sections.length} total
           </p>
         </div>
@@ -249,7 +249,7 @@ function PageHeader({ page, canDelete, onDelete }: PageHeaderProps) {
             onClick={handleDelete}
             disabled={deleting}
             title={confirm ? 'Click again to confirm' : 'Delete this page'}
-            className={`text-[8px] font-mono px-1.5 py-0.5 rounded border transition-colors flex-shrink-0 ${
+            className={`text-[10px] font-mono px-1.5 py-0.5 rounded border transition-colors flex-shrink-0 ${
               confirm
                 ? 'border-alias-red/60 text-alias-red bg-alias-red/10'
                 : 'border-border/30 text-muted-foreground/30 hover:text-alias-red hover:border-alias-red/30'
@@ -260,7 +260,7 @@ function PageHeader({ page, canDelete, onDelete }: PageHeaderProps) {
         )}
       </div>
       {page.intent && (
-        <p className="text-[8px] font-mono text-muted-foreground/40 mt-1 leading-snug line-clamp-2">{page.intent}</p>
+        <p className="text-[10px] font-mono text-muted-foreground/40 mt-1 leading-snug line-clamp-2">{page.intent}</p>
       )}
     </div>
   );
@@ -362,8 +362,8 @@ export function SiteStructureTab({ jobId, sitePlan, onPlanChange, onPageRebuilt 
         <div className="flex items-center justify-between mb-6">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-muted-foreground">AEO Site Structure</span>
-              <span className="text-[8px] font-mono px-2 py-0.5 rounded border border-alias-green/30 text-alias-green bg-alias-green/5 uppercase tracking-wider">
+              <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">AEO Site Structure</span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-alias-green/30 text-alias-green bg-alias-green/5 uppercase tracking-wider">
                 Tactical Grid
               </span>
             </div>
@@ -377,7 +377,7 @@ export function SiteStructureTab({ jobId, sitePlan, onPlanChange, onPageRebuilt 
             {(Object.entries(IMPORTANCE) as [AeoImportance, typeof IMPORTANCE[AeoImportance]][]).map(([key, val]) => (
               <div key={key} className="flex items-center gap-1.5">
                 <span className={`w-2 h-2 rounded-full ${val.dot}`} />
-                <span className="text-[8px] font-mono text-muted-foreground/50">{val.label}</span>
+                <span className="text-[10px] font-mono text-muted-foreground/50">{val.label}</span>
               </div>
             ))}
           </div>
@@ -438,7 +438,7 @@ export function SiteStructureTab({ jobId, sitePlan, onPlanChange, onPageRebuilt 
 
 
         {/* Footer note */}
-        <p className="text-[8px] font-mono text-muted-foreground/25 mt-6 text-center">
+        <p className="text-[10px] font-mono text-muted-foreground/25 mt-6 text-center">
           Generated at {new Date(sitePlan.generatedAt).toLocaleString()} ·
           {' '}{sitePlan.pages.reduce((t, p) => t + p.sections.filter(s => s.importance === 'critical').length, 0)} critical AEO sections across {sitePlan.pages.length} page{sitePlan.pages.length !== 1 ? 's' : ''}
         </p>

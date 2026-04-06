@@ -29,17 +29,15 @@ export async function POST(_req: NextRequest, { params }: RouteContext) {
   const homeHtml = job.pages?.home?.html ?? job.phases.synthesize.builtHtml ?? '';
   if (!homeHtml) return NextResponse.json({ error: 'No built HTML available' }, { status: 400 });
 
-  // Fallback: if no original score was captured during the pipeline,
-  // use a synthetic baseline that signals the rebuild improved things.
-  const beforeScore = job.originalScore ?? {
-    ...afterScore,
-    overall: Math.max(0, afterScore.overall - 25),
-    content_structure: Math.max(0, afterScore.content_structure - 20),
-    eeat: Math.max(0, afterScore.eeat - 30),
-    technical: Math.max(0, afterScore.technical - 15),
-    entity_alignment: Math.max(0, afterScore.entity_alignment - 20),
-    aiSummary: 'Original site analysis unavailable.',
-  };
+  // Strict: require a genuine original score.
+  // Using an arithmetic fallback (afterScore - 25) produces a misleading improvement delta
+  // that has no basis in reality. If no originalScore was captured during the pipeline,
+  // the user must re-run to generate one.
+  const beforeScore = job.originalScore;
+  if (!beforeScore) return NextResponse.json(
+    { error: 'Original site score is unavailable. Re-run the pipeline for this URL to generate an honest before/after comparison.' },
+    { status: 400 }
+  );
 
   try {
     const { executiveSummary, recommendations } = await generateStrategistReport(

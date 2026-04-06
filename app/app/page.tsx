@@ -295,7 +295,7 @@ export default function HomePage() {
           <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-alias-green">COMPILER</span>
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-muted-foreground/50 hidden sm:block">
+          <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground/50 hidden sm:block">
             Clone · Analyze · Rebuild · Optimize
           </span>
         </div>
@@ -320,7 +320,7 @@ export default function HomePage() {
         <div className="relative z-10 w-full max-w-3xl flex flex-col items-center text-center gap-6">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-alias-green/30 bg-alias-green-dim">
             <span className="w-1.5 h-1.5 rounded-full bg-alias-green animate-pulse" />
-            <span className="text-[9px] font-mono uppercase tracking-[0.25em] text-alias-green">AEO-First Rebuild Engine</span>
+            <span className="text-[10px] font-mono uppercase tracking-[0.25em] text-alias-green">AEO-First Rebuild Engine</span>
           </div>
 
           <div className="space-y-2">
@@ -334,9 +334,7 @@ export default function HomePage() {
           </div>
 
           <p className="text-sm text-muted-foreground max-w-lg leading-relaxed">
-            Enter any public URL. ALIAS extracts the design system, rebuilds the site
-            with semantic HTML5, Schema.org structured data, and AEO-optimised copy —
-            then audits it with a simulated AI crawler.
+            Enter any public URL. ALIAS extracts the design system, rebuilds the site to optimise for AEO and assigns your branding.
           </p>
 
           <form onSubmit={handleSubmit} className="w-full max-w-xl mt-2">
@@ -355,18 +353,18 @@ export default function HomePage() {
               <button
                 type="submit"
                 disabled={loading || !url.trim()}
-                className="px-6 py-4 bg-alias-green text-background text-xs font-mono uppercase tracking-[0.2em] font-bold transition-all hover:bg-alias-green/90 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 flex-shrink-0"
+                className="px-6 py-4 bg-alias-green text-background text-sm font-mono uppercase tracking-[0.2em] font-bold transition-all hover:bg-alias-green/90 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 flex-shrink-0"
               >
                 {loading ? <span className="animate-terminal-blink">▶</span> : '▶ RUN'}
               </button>
             </div>
 
             {error && (
-              <p className="mt-2 text-[11px] font-mono text-alias-red text-left px-1">✗ {error}</p>
+              <p className="mt-2 text-[14px] font-mono text-alias-red text-left px-1">✗ {error}</p>
             )}
 
             <div className="mt-4 flex flex-col gap-1.5">
-              <p className="text-[9px] font-mono uppercase tracking-[0.2em] text-muted-foreground/50">Output Mode</p>
+              <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground/50">Output Mode</p>
               <div className="flex gap-2">
                 <button type="button" onClick={() => setFidelityMode('aeo-first')}
                   className={`flex-1 px-3 py-2.5 rounded border text-[10px] font-mono uppercase tracking-[0.15em] transition-all ${
@@ -374,9 +372,9 @@ export default function HomePage() {
                       ? 'border-alias-green bg-alias-green/10 text-alias-green'
                       : 'border-border/40 text-muted-foreground/50 hover:border-border hover:text-foreground'
                   }`}>
-                  <span className="block text-[8px] mb-0.5 opacity-60">◈</span>
+                  <span className="block text-[10px] mb-0.5 opacity-60">◈</span>
                   AEO-First
-                  <span className="block text-[8px] mt-0.5 opacity-50 normal-case tracking-normal">Rewrites structure for AI</span>
+                  <span className="block text-[10px] mt-0.5 opacity-50 normal-case tracking-normal">Rewrites structure for AI</span>
                 </button>
                 <button type="button" onClick={() => setFidelityMode('brand-first')}
                   className={`flex-1 px-3 py-2.5 rounded border text-[10px] font-mono uppercase tracking-[0.15em] transition-all ${
@@ -384,9 +382,9 @@ export default function HomePage() {
                       ? 'border-alias-amber bg-alias-amber/10 text-alias-amber'
                       : 'border-border/40 text-muted-foreground/50 hover:border-border hover:text-foreground'
                   }`}>
-                  <span className="block text-[8px] mb-0.5 opacity-60">◉</span>
+                  <span className="block text-[10px] mb-0.5 opacity-60">◉</span>
                   Brand-First
-                  <span className="block text-[8px] mt-0.5 opacity-50 normal-case tracking-normal">Keeps original layout + fonts</span>
+                  <span className="block text-[10px] mt-0.5 opacity-50 normal-case tracking-normal">Keeps original layout + fonts</span>
                 </button>
               </div>
             </div>
@@ -407,11 +405,11 @@ export default function HomePage() {
             ].map((item, i) => (
               <div key={item.step} className="flex items-center gap-2">
                 <div className="flex flex-col items-center gap-1 px-3 py-2 rounded border border-border/40 bg-card/50 min-w-[80px]">
-                  <span className="text-[8px] font-mono text-alias-green/60 tracking-widest">{item.step}</span>
-                  <span className="text-[11px] font-mono uppercase tracking-wide text-foreground/80">{item.label}</span>
-                  <span className="text-[8px] font-mono text-muted-foreground/50 text-center leading-tight hidden sm:block">{item.desc}</span>
+                  <span className="text-[10px] font-mono text-alias-green/60 tracking-widest">{item.step}</span>
+                  <span className="text-[14px] font-mono uppercase tracking-wide text-foreground/80">{item.label}</span>
+                  <span className="text-[10px] font-mono text-muted-foreground/50 text-center leading-tight hidden sm:block">{item.desc}</span>
                 </div>
-                {i < 4 && <span className="text-muted-foreground/20 text-xs hidden sm:block">→</span>}
+                {i < 4 && <span className="text-muted-foreground/20 text-sm hidden sm:block">→</span>}
               </div>
             ))}
           </div>
@@ -423,9 +421,9 @@ export default function HomePage() {
         <section className="px-6 pb-12 max-w-3xl mx-auto w-full">
           <div className="border-t border-border/30 pt-8">
             <div className="flex items-center justify-between mb-4">
-              <p className="text-[9px] font-mono uppercase tracking-[0.25em] text-muted-foreground">Recent Jobs</p>
+              <p className="text-[10px] font-mono uppercase tracking-[0.25em] text-muted-foreground">Recent Jobs</p>
               <button onClick={() => { setRecentJobs([]); localStorage.removeItem('alias-compiler-jobs'); }}
-                className="text-[9px] font-mono uppercase tracking-[0.15em] text-muted-foreground/40 hover:text-alias-red transition-colors">
+                className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground/40 hover:text-alias-red transition-colors">
                 Clear
               </button>
             </div>
@@ -434,10 +432,10 @@ export default function HomePage() {
                 <a key={job.jobId} href={`/clone/${job.jobId}`}
                   className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-card/30 hover:bg-card hover:border-border/80 transition-all group">
                   <div className="flex items-center gap-3 min-w-0">
-                    <span className="text-[9px] font-mono text-alias-green/60">◈</span>
-                    <span className="text-[11px] font-mono text-foreground/70 truncate group-hover:text-foreground transition-colors">{job.url}</span>
+                    <span className="text-[10px] font-mono text-alias-green/60">◈</span>
+                    <span className="text-[14px] font-mono text-foreground/70 truncate group-hover:text-foreground transition-colors">{job.url}</span>
                   </div>
-                  <span className="text-[9px] font-mono text-muted-foreground/40 flex-shrink-0 ml-4">
+                  <span className="text-[10px] font-mono text-muted-foreground/40 flex-shrink-0 ml-4">
                     {new Date(job.createdAt).toLocaleDateString()}
                   </span>
                 </a>
@@ -448,7 +446,7 @@ export default function HomePage() {
       )}
 
       <footer className="py-6 px-6 border-t border-border/20 text-center">
-        <p className="text-[9px] font-mono uppercase tracking-[0.2em] text-muted-foreground/40">
+        <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground/40">
           ALIAS COMPILER · AEO Rebuild Engine · {new Date().getFullYear()}
         </p>
       </footer>
@@ -469,12 +467,12 @@ export default function HomePage() {
               <div className="px-5 pt-5 pb-4 border-b border-border/30">
                 <div className="flex items-center gap-2 mb-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-alias-green animate-pulse" />
-                  <span className="text-[9px] font-mono uppercase tracking-[0.25em] text-alias-green">Step 1 of 2 · Strategy</span>
+                  <span className="text-[10px] font-mono uppercase tracking-[0.25em] text-alias-green">Step 1 of 2 · Strategy</span>
                 </div>
                 <p className="text-[15px] font-semibold text-foreground leading-snug">
                   What is the primary objective of this site?
                 </p>
-                <p className="text-[11px] text-muted-foreground/55 mt-1">
+                <p className="text-[14px] text-muted-foreground/55 mt-1">
                   Shapes content strategy, CTA structure, Schema.org type, and copy tone.
                 </p>
               </div>
@@ -487,9 +485,9 @@ export default function HomePage() {
                     onClick={() => handleObjectiveSelect(obj.id)}
                     className="group text-left p-3.5 rounded-lg border border-border/40 bg-card/40 hover:border-alias-green/60 hover:bg-alias-green/5 transition-all active:scale-[0.98]"
                   >
-                    <span className="block text-[11px] font-mono text-alias-green/50 mb-1.5 group-hover:text-alias-green transition-colors">{obj.icon}</span>
-                    <span className="block text-[12px] font-mono font-semibold uppercase tracking-[0.12em] text-foreground/90 group-hover:text-foreground transition-colors leading-none mb-1">{obj.label}</span>
-                    <span className="block text-[9px] font-mono text-muted-foreground/50 normal-case tracking-normal group-hover:text-muted-foreground/70 transition-colors">{obj.sub}</span>
+                    <span className="block text-[14px] font-mono text-alias-green/50 mb-1.5 group-hover:text-alias-green transition-colors">{obj.icon}</span>
+                    <span className="block text-[14px] font-mono font-semibold uppercase tracking-[0.12em] text-foreground/90 group-hover:text-foreground transition-colors leading-none mb-1">{obj.label}</span>
+                    <span className="block text-[10px] font-mono text-muted-foreground/50 normal-case tracking-normal group-hover:text-muted-foreground/70 transition-colors">{obj.sub}</span>
                   </button>
                 ))}
               </div>
@@ -513,7 +511,7 @@ export default function HomePage() {
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-alias-green animate-pulse" />
-                    <span className="text-[9px] font-mono uppercase tracking-[0.25em] text-alias-green">Step 2 of 2 · Vibe Forge</span>
+                    <span className="text-[10px] font-mono uppercase tracking-[0.25em] text-alias-green">Step 2 of 2 · Vibe Forge</span>
                   </div>
                   {/* Progress dots */}
                   <div className="flex items-center gap-1.5">
@@ -526,12 +524,12 @@ export default function HomePage() {
                           : 'w-2 h-2 bg-border/50'
                       }`} />
                     ))}
-                    <span className="text-[9px] font-mono text-muted-foreground/40 ml-1">
+                    <span className="text-[10px] font-mono text-muted-foreground/40 ml-1">
                       {currentDuel + 1}/{DUELS.length}
                     </span>
                   </div>
                 </div>
-                <p className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground/50">{duel.tag}</p>
+                <p className="text-[14px] font-mono uppercase tracking-[0.18em] text-muted-foreground/50">{duel.tag}</p>
                 <p className="text-[15px] font-semibold text-foreground mt-0.5">{duel.question}</p>
                 <p className="text-[10px] text-muted-foreground/40 font-mono mt-0.5">5 duels. No essays. Just pick.</p>
               </div>
@@ -552,17 +550,17 @@ export default function HomePage() {
                       </div>
                       {/* Label */}
                       <div className="px-3 py-2.5">
-                        <span className="block text-[11px] font-mono font-semibold uppercase tracking-[0.1em] text-foreground/90 group-hover:text-foreground transition-colors leading-none mb-0.5">
+                        <span className="block text-[14px] font-mono font-semibold uppercase tracking-[0.1em] text-foreground/90 group-hover:text-foreground transition-colors leading-none mb-0.5">
                           {opt.label}
                         </span>
-                        <span className="block text-[9px] font-mono text-muted-foreground/45 normal-case tracking-normal group-hover:text-muted-foreground/65 transition-colors">
+                        <span className="block text-[10px] font-mono text-muted-foreground/45 normal-case tracking-normal group-hover:text-muted-foreground/65 transition-colors">
                           {opt.sub}
                         </span>
                       </div>
                     </button>
                     {optIdx === 0 && (
                       <div key="vs" className="flex items-center">
-                        <span className="text-[9px] font-mono font-bold text-muted-foreground/30 uppercase tracking-widest">vs</span>
+                        <span className="text-[10px] font-mono font-bold text-muted-foreground/30 uppercase tracking-widest">vs</span>
                       </div>
                     )}
                   </>
@@ -580,7 +578,7 @@ export default function HomePage() {
                   ← Back
                 </button>
                 <button onClick={closeModal}
-                  className="px-4 py-2 rounded-lg border border-border/20 text-[9px] font-mono uppercase tracking-[0.15em] text-muted-foreground/25 hover:text-muted-foreground/40 transition-all">
+                  className="px-4 py-2 rounded-lg border border-border/20 text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground/25 hover:text-muted-foreground/40 transition-all">
                   Cancel
                 </button>
               </div>

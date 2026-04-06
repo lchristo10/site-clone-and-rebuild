@@ -10,12 +10,12 @@ function ScoreDelta({ before, after, label }: { before: number; after: number; l
   const sign = delta >= 0 ? '+' : '';
   return (
     <div className="flex flex-col items-center gap-0.5">
-      <p className="text-[8px] font-mono uppercase tracking-[0.15em] text-muted-foreground/50">{label}</p>
+      <p className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground/50">{label}</p>
       <div className="flex items-center gap-1">
         <span className="text-[10px] font-mono text-muted-foreground/40">{before}</span>
-        <span className="text-[8px] text-muted-foreground/25">→</span>
-        <span className="text-[11px] font-mono font-semibold text-foreground">{after}</span>
-        <span className={`text-[9px] font-mono font-bold ${color}`}>({sign}{delta})</span>
+        <span className="text-[10px] text-muted-foreground/25">→</span>
+        <span className="text-[14px] font-mono font-semibold text-foreground">{after}</span>
+        <span className={`text-[10px] font-mono font-bold ${color}`}>({sign}{delta})</span>
       </div>
     </div>
   );
@@ -72,18 +72,18 @@ function RecCard({ rec, onUpdate, onApply, applying, applyResult, applyError }: 
         onClick={() => !applying && setExpanded(e => !e)}
         disabled={applying}
       >
-        <span className={`text-[7px] font-mono uppercase tracking-[0.15em] px-1.5 py-0.5 rounded border flex-shrink-0 mt-0.5 ${priorityColor}`}>
+        <span className={`text-[10px] font-mono uppercase tracking-[0.15em] px-1.5 py-0.5 rounded border flex-shrink-0 mt-0.5 ${priorityColor}`}>
           {rec.priority}
         </span>
         <div className="flex-1 min-w-0">
-          <p className={`text-[11px] font-mono font-semibold leading-snug ${
+          <p className={`text-[14px] font-mono font-semibold leading-snug ${
             isApplied ? 'text-alias-green line-through opacity-60' :
             applying  ? 'text-alias-amber' :
             isSettled ? 'text-muted-foreground' : 'text-foreground'
           }`}>
             {rec.title}
           </p>
-          <p className="text-[9px] font-mono text-muted-foreground/50 mt-0.5 capitalize">{rec.sectionType} section</p>
+          <p className="text-[10px] font-mono text-muted-foreground/50 mt-0.5 capitalize">{rec.sectionType} section</p>
         </div>
         <span className="text-[10px] flex-shrink-0 mt-0.5">
           {applying   ? <span className="animate-spin inline-block">⟳</span> :
@@ -98,7 +98,7 @@ function RecCard({ rec, onUpdate, onApply, applying, applyResult, applyError }: 
         <div className="px-4 pb-3">
           <div className="flex items-center gap-2 px-3 py-2 rounded border border-alias-amber/20 bg-alias-amber/5">
             <span className="w-1.5 h-1.5 rounded-full bg-alias-amber animate-pulse flex-shrink-0" />
-            <p className="text-[9px] font-mono text-alias-amber/80">
+            <p className="text-[10px] font-mono text-alias-amber/80">
               Refining <span className="font-semibold capitalize">{rec.sectionType}</span> section — this takes ~10s…
             </p>
           </div>
@@ -110,7 +110,7 @@ function RecCard({ rec, onUpdate, onApply, applying, applyResult, applyError }: 
         <div className="px-4 pb-3">
           <div className="flex items-center gap-2 px-3 py-2 rounded border border-alias-green/30 bg-alias-green/5">
             <span className="text-alias-green text-[10px]">✓</span>
-            <p className="text-[9px] font-mono text-alias-green/80">
+            <p className="text-[10px] font-mono text-alias-green/80">
               Applied — preview has been updated
             </p>
           </div>
@@ -121,7 +121,7 @@ function RecCard({ rec, onUpdate, onApply, applying, applyResult, applyError }: 
         <div className="px-4 pb-3">
           <div className="flex items-center gap-2 px-3 py-2 rounded border border-alias-red/30 bg-alias-red/5">
             <span className="text-alias-red text-[10px]">✗</span>
-            <p className="text-[9px] font-mono text-alias-red/80">
+            <p className="text-[10px] font-mono text-alias-red/80">
               {applyError ?? 'Apply failed — section type may not exist on this page'}
             </p>
           </div>
@@ -134,13 +134,13 @@ function RecCard({ rec, onUpdate, onApply, applying, applyResult, applyError }: 
           <p className="text-[10px] font-mono text-foreground/70 leading-relaxed">{rec.rationale}</p>
 
           <div className="px-3 py-2 rounded border border-border/30 bg-muted/20">
-            <p className="text-[8px] font-mono uppercase tracking-[0.15em] text-muted-foreground/50 mb-1">Suggested action</p>
-            <p className="text-[9px] font-mono text-foreground/60 leading-relaxed">{rec.suggestedAction}</p>
+            <p className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground/50 mb-1">Suggested action</p>
+            <p className="text-[10px] font-mono text-foreground/60 leading-relaxed">{rec.suggestedAction}</p>
           </div>
 
           {!isSettled && (
             <div>
-              <p className="text-[8px] font-mono uppercase tracking-[0.15em] text-muted-foreground/40 mb-1">
+              <p className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground/40 mb-1">
                 Additional direction (optional)
               </p>
               <textarea
@@ -157,13 +157,13 @@ function RecCard({ rec, onUpdate, onApply, applying, applyResult, applyError }: 
             <div className="flex gap-2">
               <button
                 onClick={() => { onApply(rec, comment); setExpanded(false); }}
-                className="flex-1 py-1.5 text-[9px] font-mono uppercase tracking-[0.15em] rounded border border-alias-green text-alias-green bg-alias-green/5 hover:bg-alias-green/15 transition-colors"
+                className="flex-1 py-1.5 text-[10px] font-mono uppercase tracking-[0.15em] rounded border border-alias-green text-alias-green bg-alias-green/5 hover:bg-alias-green/15 transition-colors"
               >
                 ◈ Apply to site
               </button>
               <button
                 onClick={() => onUpdate(rec.id, 'rejected')}
-                className="px-3 py-1.5 text-[9px] font-mono uppercase tracking-[0.15em] rounded border border-border/40 text-muted-foreground/50 hover:text-alias-red hover:border-alias-red/30 transition-colors"
+                className="px-3 py-1.5 text-[10px] font-mono uppercase tracking-[0.15em] rounded border border-border/40 text-muted-foreground/50 hover:text-alias-red hover:border-alias-red/30 transition-colors"
               >
                 ✗ Dismiss
               </button>
@@ -260,11 +260,11 @@ export function StrategistPanel({
       {/* Chrome bar */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 flex-shrink-0">
         <div className="flex items-center gap-2">
-          <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
+          <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
             ai.strategist
           </span>
           {report && (
-            <span className="text-[8px] font-mono text-muted-foreground/40">
+            <span className="text-[10px] font-mono text-muted-foreground/40">
               — {appliedCount}/{report.recommendations.length} applied
             </span>
           )}
@@ -272,7 +272,7 @@ export function StrategistPanel({
         <button
           onClick={onTrigger}
           disabled={isLoading}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-alias-green/40 text-alias-green bg-alias-green/5 hover:bg-alias-green/15 disabled:opacity-40 transition-colors text-[9px] font-mono uppercase tracking-[0.15em]"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-alias-green/40 text-alias-green bg-alias-green/5 hover:bg-alias-green/15 disabled:opacity-40 transition-colors text-[10px] font-mono uppercase tracking-[0.15em]"
         >
           {isLoading
             ? <><span className="animate-terminal-blink">◆</span> Analysing…</>
@@ -295,7 +295,7 @@ export function StrategistPanel({
         {isLoading && (
           <div className="flex flex-col items-center justify-center py-8 gap-3">
             <div className="w-1.5 h-1.5 rounded-full bg-alias-green animate-pulse" />
-            <p className="text-[9px] font-mono text-alias-green/60 uppercase tracking-[0.2em]">Reviewing rebuilt site…</p>
+            <p className="text-[10px] font-mono text-alias-green/60 uppercase tracking-[0.2em]">Reviewing rebuilt site…</p>
           </div>
         )}
 
@@ -306,13 +306,13 @@ export function StrategistPanel({
 
             {/* Executive summary */}
             <div className="px-3 py-2.5 rounded-lg border border-border/30 bg-muted/20">
-              <p className="text-[8px] font-mono uppercase tracking-[0.15em] text-muted-foreground/40 mb-1.5">Strategist Assessment</p>
+              <p className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground/40 mb-1.5">Strategist Assessment</p>
               <p className="text-[10px] font-mono text-foreground/70 leading-relaxed">{report.executiveSummary}</p>
             </div>
 
             {/* Recommendations */}
             {pendingCount > 0 && (
-              <p className="text-[8px] font-mono uppercase tracking-[0.15em] text-muted-foreground/40">
+              <p className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground/40">
                 {pendingCount} recommendation{pendingCount !== 1 ? 's' : ''} pending
               </p>
             )}

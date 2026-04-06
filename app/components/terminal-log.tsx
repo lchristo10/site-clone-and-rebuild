@@ -185,14 +185,14 @@ function MilestoneRow({ milestone, isActive }: { milestone: Milestone; isActive:
         'border-border/30 text-muted-foreground/30'
       }`}>
         {status === 'done'    && <span className="text-[10px]">✓</span>}
-        {status === 'running' && <span className="text-[9px] animate-terminal-blink font-mono">◆</span>}
+        {status === 'running' && <span className="text-[10px] animate-terminal-blink font-mono">◆</span>}
         {status === 'error'   && <span className="text-[10px]">✗</span>}
         {status === 'pending' && <span className="text-[10px] font-mono text-muted-foreground/20">{icon}</span>}
       </div>
 
       {/* Label + sub-text */}
       <div className="flex-1 min-w-0">
-        <p className={`text-[12px] font-mono font-semibold uppercase tracking-[0.1em] leading-none transition-colors duration-300 ${
+        <p className={`text-[14px] font-mono font-semibold uppercase tracking-[0.1em] leading-none transition-colors duration-300 ${
           status === 'done'    ? 'text-foreground/80' :
           status === 'running' ? 'text-foreground' :
           status === 'error'   ? 'text-alias-red' :
@@ -203,14 +203,14 @@ function MilestoneRow({ milestone, isActive }: { milestone: Milestone; isActive:
 
         {/* Active status line — updates in place */}
         {status === 'running' && activeText && (
-          <p className="text-[9px] font-mono text-alias-green/70 mt-1 leading-none animate-fade-in-up">
+          <p className="text-[10px] font-mono text-alias-green/70 mt-1 leading-none animate-fade-in-up">
             {activeText}
           </p>
         )}
 
         {/* Completed summary */}
         {status === 'done' && completedText && (
-          <p className="text-[9px] font-mono text-muted-foreground/40 mt-1 leading-none">
+          <p className="text-[10px] font-mono text-muted-foreground/40 mt-1 leading-none">
             {completedText}
           </p>
         )}
@@ -218,7 +218,7 @@ function MilestoneRow({ milestone, isActive }: { milestone: Milestone; isActive:
 
       {/* Duration badge */}
       {status === 'done' && duration && (
-        <span className="text-[8px] font-mono text-muted-foreground/30 flex-shrink-0 mt-1">{duration}</span>
+        <span className="text-[10px] font-mono text-muted-foreground/30 flex-shrink-0 mt-1">{duration}</span>
       )}
 
       {/* Pulse while active */}
@@ -239,8 +239,8 @@ function ToastItem({ toast }: { toast: Toast }) {
       toast.exiting ? 'opacity-0 translate-x-4 scale-95' : 'opacity-100 translate-x-0 scale-100'
     }`}
       style={{ transitionProperty: 'opacity, transform' }}>
-      <span className="text-alias-green/60 text-[9px] flex-shrink-0">{toast.icon}</span>
-      <p className="text-[9px] font-mono text-foreground/70 leading-tight">{toast.text}</p>
+      <span className="text-alias-green/60 text-[10px] flex-shrink-0">{toast.icon}</span>
+      <p className="text-[10px] font-mono text-foreground/70 leading-tight">{toast.text}</p>
     </div>
   );
 }
@@ -473,29 +473,29 @@ export function TerminalLog({ jobId, onComplete }: TerminalLogProps) {
             </div>
             <div className="flex-1 flex items-center justify-between ml-3">
               <div className="flex items-center gap-2">
-                <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
+                <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
                   ALIAS
                 </span>
                 {sourceUrl ? (
                   <>
-                    <span className="text-muted-foreground/30 font-mono text-[9px]">for</span>
-                    <span className="text-[9px] font-mono text-foreground/70 truncate max-w-[240px]">
+                    <span className="text-muted-foreground/30 font-mono text-[10px]">for</span>
+                    <span className="text-[10px] font-mono text-foreground/70 truncate max-w-[240px]">
                       {sourceUrl.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}
                     </span>
                   </>
                 ) : (
-                  <span className="text-[9px] font-mono text-muted-foreground/40 uppercase tracking-[0.2em]">compiler</span>
+                  <span className="text-[10px] font-mono text-muted-foreground/40 uppercase tracking-[0.2em]">compiler</span>
                 )}
               </div>
 
               <div className="flex items-center gap-2">
                 {isDone && (
-                  <span className="text-[8px] font-mono text-alias-green uppercase tracking-wider">
+                  <span className="text-[10px] font-mono text-alias-green uppercase tracking-wider">
                     ● complete {totalDuration && `· ${totalDuration}`}
                   </span>
                 )}
                 {!isDone && !error && activeCount > 0 && (
-                  <span className="text-[8px] font-mono text-alias-amber uppercase tracking-wider animate-pulse">
+                  <span className="text-[10px] font-mono text-alias-amber uppercase tracking-wider animate-pulse">
                     ● running
                   </span>
                 )}
@@ -510,10 +510,10 @@ export function TerminalLog({ jobId, onComplete }: TerminalLogProps) {
             {!isDone && (
               <div className="mb-5">
                 <div className="flex items-center justify-between mb-1.5">
-                  <p className="text-[8px] font-mono uppercase tracking-[0.2em] text-muted-foreground/50">
+                  <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground/50">
                     Pipeline Progress
                   </p>
-                  <p className="text-[8px] font-mono text-muted-foreground/40">
+                  <p className="text-[10px] font-mono text-muted-foreground/40">
                     {activeCount}/{milestones.length}
                   </p>
                 </div>
@@ -547,7 +547,7 @@ export function TerminalLog({ jobId, onComplete }: TerminalLogProps) {
             {/* Toast stack — during running, below milestones */}
             {toasts.length > 0 && (
               <div className="mt-5 space-y-1.5">
-                <p className="text-[8px] font-mono uppercase tracking-[0.2em] text-muted-foreground/30 mb-2">
+                <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground/30 mb-2">
                   Discoveries
                 </p>
                 {toasts.map(t => <ToastItem key={t.id} toast={t} />)}
@@ -558,7 +558,7 @@ export function TerminalLog({ jobId, onComplete }: TerminalLogProps) {
           {/* AEO Score — docked to bottom of left panel when done */}
           {isDone && score && (
             <div className="flex-1 p-4 overflow-y-auto min-h-0 animate-fade-in-up">
-              <p className="text-[9px] font-mono uppercase tracking-[0.2em] text-muted-foreground mb-3">AEO Audit Score</p>
+              <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground mb-3">AEO Audit Score</p>
               <AeoScoreGrid
                 overall={score.overall}
                 content_structure={score.content_structure}
@@ -577,7 +577,7 @@ export function TerminalLog({ jobId, onComplete }: TerminalLogProps) {
           {screenshotUrl && (
             <div className="bg-card border border-border rounded-lg overflow-hidden flex-shrink-0">
               <div className="px-3 py-2 border-b border-border/50">
-                <p className="text-[9px] font-mono uppercase tracking-[0.2em] text-muted-foreground">Original Site</p>
+                <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">Original Site</p>
               </div>
               <div className="relative aspect-video overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -592,9 +592,9 @@ export function TerminalLog({ jobId, onComplete }: TerminalLogProps) {
           {tokens && entityMap && (
             <div className="bg-card border border-border rounded-lg p-4 flex-shrink-0 overflow-y-auto max-h-[400px]">
               <div className="flex items-center justify-between mb-3">
-                <p className="text-[9px] font-mono uppercase tracking-[0.2em] text-muted-foreground">Extracted Tokens</p>
+                <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">Extracted Tokens</p>
                 {colorsSaveStatus !== 'idle' && (
-                  <span className={`text-[8px] font-mono transition-colors ${
+                  <span className={`text-[10px] font-mono transition-colors ${
                     colorsSaveStatus === 'saving' ? 'text-alias-amber animate-pulse' :
                     colorsSaveStatus === 'saved'  ? 'text-alias-green' :
                     'text-alias-red'
@@ -610,7 +610,7 @@ export function TerminalLog({ jobId, onComplete }: TerminalLogProps) {
           {/* AEO Score — right column only during running (before done) */}
           {!isDone && score && (
             <div className="bg-card border border-border rounded-lg p-4 flex-shrink-0">
-              <p className="text-[9px] font-mono uppercase tracking-[0.2em] text-muted-foreground mb-3">AEO Audit Score</p>
+              <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground mb-3">AEO Audit Score</p>
               <AeoScoreGrid
                 overall={score.overall}
                 content_structure={score.content_structure}
