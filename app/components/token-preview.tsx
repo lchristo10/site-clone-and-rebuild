@@ -71,16 +71,16 @@ function SwatchRow({ item, onDelete, onHexChange }: SwatchRowProps) {
   };
 
   return (
-    <div className="group flex items-center gap-2 py-0.5">
+    <div className="group flex items-center gap-2.5 py-1">
       {/* Swatch chip — click to edit */}
       <button
         title={editing ? undefined : `Click to edit ${item.hex}`}
         onClick={() => { setEditing(true); setDraft(item.hex); setTimeout(() => inputRef.current?.select(), 30); }}
-        className="w-6 h-6 rounded border border-white/10 flex-shrink-0 transition-all group-hover:scale-110 group-hover:shadow-md relative overflow-hidden"
+        className="w-8 h-8 rounded border border-white/10 flex-shrink-0 transition-all group-hover:scale-110 group-hover:shadow-md relative overflow-hidden"
         style={{ background: item.hex }}
       >
         {/* tiny pencil overlay on hover */}
-        <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[10px]"
+        <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[12px]"
           style={{ color: swatchTextColor(item.hex) }}>
           ✎
         </span>
@@ -88,7 +88,7 @@ function SwatchRow({ item, onDelete, onHexChange }: SwatchRowProps) {
 
       {/* Label + hex */}
       <div className="flex-1 min-w-0">
-        <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground leading-none mb-0.5">{item.label}</p>
+        <p className="text-[12px] font-mono uppercase tracking-widest text-muted-foreground leading-none mb-0.5">{item.label}</p>
         {editing ? (
           <input
             ref={inputRef}
@@ -96,14 +96,14 @@ function SwatchRow({ item, onDelete, onHexChange }: SwatchRowProps) {
             onChange={e => { setDraft(e.target.value); setError(false); }}
             onBlur={commitEdit}
             onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') { setEditing(false); setDraft(item.hex); } }}
-            className={`text-[10px] font-mono bg-transparent border-b outline-none w-full transition-colors ${
+            className={`text-[12px] font-mono bg-transparent border-b outline-none w-full transition-colors ${
               error ? 'border-alias-red text-alias-red' : 'border-alias-green text-alias-green'
             }`}
             maxLength={7}
             autoFocus
           />
         ) : (
-          <p className="text-[10px] font-mono text-foreground/70">{item.hex}</p>
+          <p className="text-[12px] font-mono text-foreground/70">{item.hex}</p>
         )}
       </div>
 
@@ -115,14 +115,14 @@ function SwatchRow({ item, onDelete, onHexChange }: SwatchRowProps) {
           onChange={e => { onHexChange(e.target.value); setDraft(e.target.value); }}
           className="w-0 h-0 opacity-0 absolute"
         />
-        <span className="text-[10px] text-muted-foreground/60">◉</span>
+        <span className="text-[12px] text-muted-foreground/60">◉</span>
       </label>
 
       {/* Delete */}
       <button
         title="Remove token"
         onClick={onDelete}
-        className="opacity-0 group-hover:opacity-60 hover:!opacity-100 text-alias-red transition-opacity flex-shrink-0 text-[14px] font-mono leading-none"
+        className="opacity-0 group-hover:opacity-60 hover:!opacity-100 text-alias-red transition-opacity flex-shrink-0 text-[16px] font-mono leading-none"
       >
         ✕
       </button>
@@ -157,19 +157,19 @@ function AddSwatchRow({ onAdd }: AddSwatchRowProps) {
     return (
       <button
         onClick={() => { setOpen(true); setTimeout(() => hexRef.current?.focus(), 30); }}
-        className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground/40 hover:text-alias-green transition-colors mt-1 w-full py-0.5"
+        className="flex items-center gap-1.5 text-[12px] font-mono uppercase tracking-[0.15em] text-muted-foreground/40 hover:text-alias-green transition-colors mt-1.5 w-full py-1"
       >
-        <span className="text-alias-green/40 text-sm">+</span> Add Color Token
+        <span className="text-alias-green/40 text-base">+</span> Add Color Token
       </button>
     );
   }
 
   return (
-    <div className="mt-1 flex flex-col gap-1.5 p-2 rounded-lg border border-alias-green/20 bg-alias-green/5">
+    <div className="mt-1.5 flex flex-col gap-2 p-3 rounded-lg border border-alias-green/20 bg-alias-green/5">
       <div className="flex items-center gap-2">
         {/* Live preview swatch */}
         <div
-          className="w-5 h-5 rounded border border-white/10 flex-shrink-0 transition-colors"
+          className="w-6 h-6 rounded border border-white/10 flex-shrink-0 transition-colors"
           style={{ background: isValidHex(normalizeHex(hex)) ? normalizeHex(hex) : '#333' }}
         />
         {/* Inputs */}
@@ -180,10 +180,10 @@ function AddSwatchRow({ onAdd }: AddSwatchRowProps) {
           onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setOpen(false); }}
           placeholder="#rrggbb"
           maxLength={7}
-          className="flex-1 bg-transparent text-[10px] font-mono text-foreground/80 placeholder:text-muted-foreground/30 outline-none border-b border-border/40 focus:border-alias-green/60 transition-colors"
+          className="flex-1 bg-transparent text-[12px] font-mono text-foreground/80 placeholder:text-muted-foreground/30 outline-none border-b border-border/40 focus:border-alias-green/60 transition-colors"
         />
         {/* Browser color picker */}
-        <label className="cursor-pointer text-muted-foreground/40 hover:text-alias-green transition-colors text-[10px]" title="Pick colour">
+        <label className="cursor-pointer text-muted-foreground/40 hover:text-alias-green transition-colors text-[12px]" title="Pick colour">
           <input type="color" value={isValidHex(normalizeHex(hex)) ? normalizeHex(hex) : '#000000'}
             onChange={e => setHex(e.target.value)} className="w-0 h-0 opacity-0 absolute" />
           ◉
@@ -195,18 +195,18 @@ function AddSwatchRow({ onAdd }: AddSwatchRowProps) {
         onChange={e => setLabel(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setOpen(false); }}
         placeholder="Label (e.g. Warm Accent)"
-        className="bg-transparent text-[10px] font-mono text-foreground/80 placeholder:text-muted-foreground/30 outline-none border-b border-border/40 focus:border-alias-green/60 transition-colors w-full"
+        className="bg-transparent text-[12px] font-mono text-foreground/80 placeholder:text-muted-foreground/30 outline-none border-b border-border/40 focus:border-alias-green/60 transition-colors w-full"
       />
 
-      {error && <p className="text-[10px] font-mono text-alias-red">{error}</p>}
+      {error && <p className="text-[12px] font-mono text-alias-red">{error}</p>}
 
       <div className="flex gap-2 mt-0.5">
         <button onClick={commit}
-          className="flex-1 text-[10px] font-mono uppercase tracking-wider text-alias-green border border-alias-green/40 rounded py-1 hover:bg-alias-green/10 transition-colors">
+          className="flex-1 text-[12px] font-mono uppercase tracking-wider text-alias-green border border-alias-green/40 rounded py-1.5 hover:bg-alias-green/10 transition-colors">
           + Add
         </button>
         <button onClick={() => setOpen(false)}
-          className="px-3 text-[10px] font-mono uppercase tracking-wider text-muted-foreground/40 border border-border/30 rounded py-1 hover:border-border/60 hover:text-muted-foreground transition-colors">
+          className="px-3 text-[12px] font-mono uppercase tracking-wider text-muted-foreground/40 border border-border/30 rounded py-1.5 hover:border-border/60 hover:text-muted-foreground transition-colors">
           Cancel
         </button>
       </div>
@@ -250,28 +250,28 @@ export function TokenPreview({ tokens, entityMap, onColorsChange }: TokenPreview
     <div className="space-y-4 animate-fade-in-up">
       {/* Business identity */}
       <div>
-        <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground mb-2">Entity Map</p>
+        <p className="text-[12px] font-mono uppercase tracking-[0.2em] text-muted-foreground mb-2">Entity Map</p>
         <div className="space-y-1">
           <div className="flex items-start gap-2">
-            <span className="text-[10px] font-mono text-muted-foreground/60 w-16 flex-shrink-0 uppercase">Brand</span>
-            <span className="text-[10px] font-mono text-alias-green truncate">{entityMap.businessName}</span>
+            <span className="text-[12px] font-mono text-muted-foreground/60 w-16 flex-shrink-0 uppercase">Brand</span>
+            <span className="text-[12px] font-mono text-alias-green truncate">{entityMap.businessName}</span>
           </div>
           <div className="flex items-start gap-2">
-            <span className="text-[10px] font-mono text-muted-foreground/60 w-16 flex-shrink-0 uppercase">Industry</span>
-            <span className="text-[10px] font-mono text-foreground/80 truncate">{entityMap.industry}</span>
+            <span className="text-[12px] font-mono text-muted-foreground/60 w-16 flex-shrink-0 uppercase">Industry</span>
+            <span className="text-[12px] font-mono text-foreground/80 truncate">{entityMap.industry}</span>
           </div>
           <div className="flex items-start gap-2">
-            <span className="text-[10px] font-mono text-muted-foreground/60 w-16 flex-shrink-0 uppercase">Service</span>
-            <span className="text-[10px] font-mono text-foreground/80 truncate">{entityMap.primaryService}</span>
+            <span className="text-[12px] font-mono text-muted-foreground/60 w-16 flex-shrink-0 uppercase">Service</span>
+            <span className="text-[12px] font-mono text-foreground/80 truncate">{entityMap.primaryService}</span>
           </div>
           <div className="flex items-start gap-2">
-            <span className="text-[10px] font-mono text-muted-foreground/60 w-16 flex-shrink-0 uppercase">Audience</span>
-            <span className="text-[10px] font-mono text-foreground/80 truncate">{entityMap.targetAudience}</span>
+            <span className="text-[12px] font-mono text-muted-foreground/60 w-16 flex-shrink-0 uppercase">Audience</span>
+            <span className="text-[12px] font-mono text-foreground/80 truncate">{entityMap.targetAudience}</span>
           </div>
         </div>
         <div className="flex flex-wrap gap-1 mt-2">
           {entityMap.entities.slice(0, 5).map((e) => (
-            <span key={e} className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-alias-green/30 text-alias-green bg-alias-green-dim truncate max-w-[120px]">
+            <span key={e} className="text-[12px] font-mono px-1.5 py-0.5 rounded border border-alias-green/30 text-alias-green bg-alias-green-dim truncate max-w-[120px]">
               {e}
             </span>
           ))}
@@ -283,8 +283,8 @@ export function TokenPreview({ tokens, entityMap, onColorsChange }: TokenPreview
       {/* Color Tokens — editable */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">Color Tokens</p>
-          <span className="text-[10px] font-mono text-muted-foreground/30 normal-case tracking-normal">hover to edit</span>
+          <p className="text-[12px] font-mono uppercase tracking-[0.2em] text-muted-foreground">Color Tokens</p>
+          <span className="text-[12px] font-mono text-muted-foreground/30 normal-case tracking-normal">hover to edit</span>
         </div>
 
         {/* Swatch palette strip */}
@@ -292,7 +292,7 @@ export function TokenPreview({ tokens, entityMap, onColorsChange }: TokenPreview
           {colorList.map(c => (
             <div
               key={c.key}
-              className="h-4 rounded transition-all"
+              className="h-5 rounded transition-all"
               style={{ background: c.hex, flex: 1 }}
               title={`${c.label}: ${c.hex}`}
             />
@@ -318,19 +318,19 @@ export function TokenPreview({ tokens, entityMap, onColorsChange }: TokenPreview
 
       {/* Typography */}
       <div>
-        <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground mb-2">Typography</p>
+        <p className="text-[12px] font-mono uppercase tracking-[0.2em] text-muted-foreground mb-2">Typography</p>
         <div className="space-y-1">
           <div className="flex justify-between">
-            <span className="text-[10px] font-mono text-muted-foreground">Heading</span>
-            <span className="text-[10px] font-mono text-foreground/80 truncate max-w-[120px]">{typography.headingFont}</span>
+            <span className="text-[12px] font-mono text-muted-foreground">Heading</span>
+            <span className="text-[12px] font-mono text-foreground/80 truncate max-w-[120px]">{typography.headingFont}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-[10px] font-mono text-muted-foreground">Body</span>
-            <span className="text-[10px] font-mono text-foreground/80 truncate max-w-[120px]">{typography.bodyFont}</span>
+            <span className="text-[12px] font-mono text-muted-foreground">Body</span>
+            <span className="text-[12px] font-mono text-foreground/80 truncate max-w-[120px]">{typography.bodyFont}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-[10px] font-mono text-muted-foreground">Base size</span>
-            <span className="text-[10px] font-mono text-foreground/80">{typography.baseSizePx}px</span>
+            <span className="text-[12px] font-mono text-muted-foreground">Base size</span>
+            <span className="text-[12px] font-mono text-foreground/80">{typography.baseSizePx}px</span>
           </div>
         </div>
       </div>
@@ -339,23 +339,23 @@ export function TokenPreview({ tokens, entityMap, onColorsChange }: TokenPreview
 
       {/* Spacing + Layout */}
       <div>
-        <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground mb-2">Layout</p>
+        <p className="text-[12px] font-mono uppercase tracking-[0.2em] text-muted-foreground mb-2">Layout</p>
         <div className="space-y-1">
           <div className="flex justify-between">
-            <span className="text-[10px] font-mono text-muted-foreground">Nav</span>
-            <span className="text-[10px] font-mono text-foreground/80">{layout.navType}</span>
+            <span className="text-[12px] font-mono text-muted-foreground">Nav</span>
+            <span className="text-[12px] font-mono text-foreground/80">{layout.navType}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-[10px] font-mono text-muted-foreground">Hero</span>
-            <span className="text-[10px] font-mono text-foreground/80">{layout.heroType}</span>
+            <span className="text-[12px] font-mono text-muted-foreground">Hero</span>
+            <span className="text-[12px] font-mono text-foreground/80">{layout.heroType}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-[10px] font-mono text-muted-foreground">Columns</span>
-            <span className="text-[10px] font-mono text-foreground/80">{layout.columnCount}</span>
+            <span className="text-[12px] font-mono text-muted-foreground">Columns</span>
+            <span className="text-[12px] font-mono text-foreground/80">{layout.columnCount}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-[10px] font-mono text-muted-foreground">Container</span>
-            <span className="text-[10px] font-mono text-foreground/80">{spacing.containerWidthPx}px</span>
+            <span className="text-[12px] font-mono text-muted-foreground">Container</span>
+            <span className="text-[12px] font-mono text-foreground/80">{spacing.containerWidthPx}px</span>
           </div>
         </div>
       </div>

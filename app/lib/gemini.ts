@@ -495,6 +495,101 @@ CRITICAL OUTPUT RULES — JSON fields only, no exceptions:
 
 // ─── Phase 5: AEO Audit ───────────────────────────────────────────────────────
 
+/**
+ * Converts raw page HTML into a compact structured signal document for AEO auditing.
+ *
+ * WHY: Raw HTML can be 15,000–30,000 chars and is dominated by CSS, JS, and markup
+ * boilerplate that contributes zero AEO signal but consumes token budget and
+ * risks truncating real signals (JSON-LD, headings, body text, links).
+ *
+ * This extractor surfaces ALL 20 checklist signals explicitly in plain text,
+ * keeping the audit input under ~3,000 chars regardless of page size.
+ * Pairing this with temperature=0 removes the two largest sources of score variance.
+ */
+export function extractAeoSignals(html: string): string {
+  const lines: string[] = [];
+
+  // Strip HTML tags and decode basic entities
+  const txt = (s: string): string =>
+    s.replace(/<[^>]+>/g, ' ')
+      .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
+      .replace(/\s+/g, ' ').trim();
+
+  // ── 1. Meta ──────────────────────────────────────────────────────────────
+  const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  const descMatch =
+    html.match(/<meta\s+name=["']description["']\s+content=["']([^"']*)["']/i) ??
+    html.match(/<meta\s+content=["']([^"']*)["']\s+name=["']description["']/i);
+  lines.push('=== META ===');
+  lines.push(`TITLE: ${titleMatch ? txt(titleMatch[1]) : '(missing)'}`);
+  lines.push(`META_DESCRIPTION: ${descMatch ? descMatch[1].trim() : '(missing)'}`);
+
+  // ── 2. JSON-LD (complete — critical for tc_hasJsonLd) ────────────────────
+  const jsonLdBlocks = [...html.matchAll(/<script\s+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)];
+  lines.push('\n=== JSON-LD SCHEMAS ===');
+  if (jsonLdBlocks.length === 0) {
+    lines.push('(none — tc_hasJsonLd = false)');
+  } else {
+    jsonLdBlocks.forEach((m, i) => lines.push(`Schema ${i + 1}: ${m[1].trim().substring(0, 600)}`));
+  }
+
+  // ── 3. Semantic HTML5 landmarks (tc_hasSemanticHtml) ─────────────────────
+  const landmarks = ['main', 'nav', 'header', 'footer', 'article', 'aside', 'section'];
+  const presentLandmarks = landmarks
+    .map(t => ({ t, n: (html.match(new RegExp(`<${t}[\\s>]`, 'gi')) ?? []).length }))
+    .filter(x => x.n > 0)
+    .map(x => `<${x.t}>×${x.n}`);
+  lines.push('\n=== SEMANTIC LANDMARKS ===');
+  lines.push(presentLandmarks.length > 0 ? presentLandmarks.join(', ') : '(none)');
+
+  // ── 4. All headings (cs_hasH1, tc_hasSingleH1, cs_hasQuestionDrivenHeadings) ──
+  const headings = [...html.matchAll(/<(h[1-4])[^>]*>([\s\S]*?)<\/\1>/gi)];
+  lines.push('\n=== HEADINGS ===');
+  if (headings.length === 0) {
+    lines.push('(none found)');
+  } else {
+    headings.forEach(m => lines.push(`${m[1].toUpperCase()}: ${txt(m[2]).substring(0, 120)}`));
+  }
+
+  // ── 5. First 15 paragraphs (cs_hasAnswerCapsule, ee_hasSpecificStats, ea_*) ──
+  const paras = [...html.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)].slice(0, 15);
+  lines.push('\n=== PARAGRAPHS (first 15) ===');
+  if (paras.length === 0) {
+    lines.push('(none)');
+  } else {
+    paras.forEach(m => { const t = txt(m[1]).substring(0, 250); if (t) lines.push(`• ${t}`); });
+  }
+
+  // ── 6. List items (cs_hasListsOrTables) ──────────────────────────────────
+  const listItems = [...html.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)].slice(0, 20);
+  lines.push('\n=== LIST ITEMS (first 20) ===');
+  if (listItems.length === 0) {
+    lines.push('(none)');
+  } else {
+    listItems.forEach(m => { const t = txt(m[1]).substring(0, 150); if (t) lines.push(`– ${t}`); });
+  }
+
+  // ── 7. Tables ─────────────────────────────────────────────────────────────
+  const tableCount = (html.match(/<table[\s>]/gi) ?? []).length;
+  lines.push(`\nTABLES: ${tableCount > 0 ? `${tableCount} present` : 'none'}`);
+
+  // ── 8. Links (ea_hasInternalLinks) ───────────────────────────────────────
+  const allLinks = [...html.matchAll(/<a\s[^>]*href=["']([^"'#][^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi)];
+  const internalLinks = allLinks.filter(m => m[1].startsWith('/') || !/^https?:\/\//.test(m[1]));
+  const externalLinks = allLinks.filter(m => /^https?:\/\//.test(m[1]));
+  lines.push('\n=== LINKS ===');
+  lines.push(`Internal (${internalLinks.length}): ${internalLinks.slice(0, 10).map(m => m[1]).join(', ') || '(none)'}`);
+  lines.push(`External (${externalLinks.length}): ${externalLinks.slice(0, 5).map(m => m[1]).join(', ') || '(none)'}`);
+
+  // ── 9. Body text volume (tc_isReadableWithoutJs proxy) ───────────────────
+  const bodyCharCount = paras.map(m => txt(m[1])).join(' ').length;
+  lines.push(`\nBODY_TEXT_CHARS: ${bodyCharCount} (>=300 = readable without JS)`);
+
+  return lines.join('\n');
+}
+
+
 /** Minimal HTML escaping for use inside normalizeMarkdownToAuditHtml. */
 function escHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -675,10 +770,16 @@ function computeAeoScoreFromChecklist(
 
 
 export async function auditAeoScore(builtHtml: string, crawledPageTitles: string[] = []): Promise<AeoScore> {
+  // Option A+B: Pre-extract structured signals from raw HTML before sending to Gemini.
+  // This eliminates CSS/JS noise, avoids the 12k truncation problem, and produces a
+  // stable ~3k-char input regardless of page size. Combined with temperature=0, this
+  // is the primary mechanism for deterministic scoring on the same HTML input.
+  const signalDoc = extractAeoSignals(builtHtml);
+
   const model = getClient().getGenerativeModel({
     model: 'gemini-2.5-flash',
     generationConfig: {
-      temperature: 0.2,
+      temperature: 0,   // Option A: binary classification must be deterministic
       responseMimeType: 'application/json',
       responseSchema: {
         type: SchemaType.OBJECT,
@@ -729,11 +830,13 @@ export async function auditAeoScore(builtHtml: string, crawledPageTitles: string
     : '';
 
   const prompt = `You are an AI auditor evaluating a webpage for Answer Engine Optimization (AEO).
-Read the HTML carefully and answer each of the 20 binary questions below with true or false.
-Be strict — only mark true if the evidence is clearly and unambiguously present in the HTML.
+Below is a PRE-EXTRACTED SIGNAL DOCUMENT derived from the full page HTML.
+All CSS, JavaScript, and markup boilerplate has been stripped — every AEO-relevant signal is surfaced explicitly.
+Read the signal document carefully and answer each of the 20 binary questions with true or false.
+Be strict — only mark true if the evidence is clearly and unambiguously present in the signal document.
 
-HTML CONTENT:
-${builtHtml.substring(0, 12000)}
+SIGNAL DOCUMENT:
+${signalDoc}
 ${ crawledPagesInfo ? `\n${crawledPagesInfo}` : '' }
 
 ── CONTENT STRUCTURE (cs_*) ─────────────────────────────────────────────────
@@ -826,6 +929,152 @@ Return only valid JSON. Answer every boolean field — do not omit any.`;
     parsed.recommendations,
     parsed.missingPageSuggestions,
   );
+}
+
+// ─── Expected gain calculator ────────────────────────────────────────────────
+
+/**
+ * Maps a recommendation's id/sectionType to the AEO checklist flags it would
+ * flip, then computes the deterministic overall-score delta if those flags
+ * changed from false → true.
+ *
+ * Weights mirror computeAeoScoreFromChecklist exactly:
+ *   Content Structure (cs_*) contributes 30% to overall
+ *   E-E-A-T         (ee_*)  contributes 30% to overall
+ *   Technical        (tc_*)  contributes 20% to overall
+ *   Entity Alignment (ea_*)  contributes 15% to overall
+ *
+ * Each flag's contribution = (flagWeight / categoryTotalWeight) * categoryOverallWeight
+ */
+export function computeExpectedGainForRec(
+  checklist: AeoChecklist,
+  recId: string,
+  sectionType: string,
+): number {
+  // Helper: compute overall delta if a set of flags were forced true
+  const deltaIfFlipped = (
+    flags: (keyof AeoChecklist)[],
+    categoryWeight: number,   // e.g. 0.30 for CS/EEAT
+    flagWeights: Record<string, number>,
+    categoryTotalWeight: number,
+  ): number => {
+    let gain = 0;
+    for (const flag of flags) {
+      if (!checklist[flag]) {  // only contributes if currently false
+        const w = flagWeights[flag as string] ?? 0;
+        // Contribution to overall = (w / categoryTotalWeight) * categoryWeight * 100
+        gain += (w / categoryTotalWeight) * categoryWeight * 100;
+      }
+    }
+    return Math.round(gain);
+  };
+
+  const id = recId.toLowerCase();
+  const st = sectionType.toLowerCase();
+
+  // ── Map recommendation patterns to checklist flags ───────────────────────
+
+  // Testimonials / social proof
+  if (st === 'testimonials' || id.includes('testimonial') || id.includes('review') || id.includes('social-proof')) {
+    return deltaIfFlipped(
+      ['ee_hasTestimonialsOrReviews'],
+      0.30, { ee_hasTestimonialsOrReviews: 5 }, 40,
+    );
+  }
+
+  // E-E-A-T: Stats / specific claims
+  if (id.includes('stat') || id.includes('number') || id.includes('result') || id.includes('data') || id.includes('proof')) {
+    return deltaIfFlipped(
+      ['ee_hasSpecificStats'],
+      0.30, { ee_hasSpecificStats: 15 }, 40,
+    );
+  }
+
+  // E-E-A-T: Named people / credentials / about
+  if (st === 'about' || id.includes('author') || id.includes('credential') || id.includes('team') || id.includes('bio') || id.includes('expertise')) {
+    return deltaIfFlipped(
+      ['ee_hasAboutOrAuthorship', 'ee_hasNamedPeopleOrCredentials'],
+      0.30, { ee_hasAboutOrAuthorship: 5, ee_hasNamedPeopleOrCredentials: 5 }, 40,
+    );
+  }
+
+  // Trust / Certifications
+  if (id.includes('trust') || id.includes('certif') || id.includes('award') || id.includes('badge') || id.includes('guarantee')) {
+    return deltaIfFlipped(
+      ['ee_hasCertificationsOrTrust'],
+      0.30, { ee_hasCertificationsOrTrust: 10 }, 40,
+    );
+  }
+
+  // Content structure: Answer capsule / inverted pyramid
+  if (id.includes('answer') || id.includes('capsule') || id.includes('summary') || id.includes('opening') || id.includes('lede')) {
+    return deltaIfFlipped(
+      ['cs_hasAnswerCapsule'],
+      0.30, { cs_hasAnswerCapsule: 15 }, 40,
+    );
+  }
+
+  // Content structure: Lists / tables
+  if (id.includes('list') || id.includes('bullet') || id.includes('table') || id.includes('format')) {
+    return deltaIfFlipped(
+      ['cs_hasListsOrTables'],
+      0.30, { cs_hasListsOrTables: 10 }, 40,
+    );
+  }
+
+  // Content structure: Question-driven headings
+  if (id.includes('question') || id.includes('heading') || id.includes('h2') || id.includes('faq')) {
+    return deltaIfFlipped(
+      ['cs_hasQuestionDrivenHeadings'],
+      0.30, { cs_hasQuestionDrivenHeadings: 5 }, 40,
+    );
+  }
+
+  // Technical: JSON-LD schema
+  if (id.includes('schema') || id.includes('json') || id.includes('structured-data') || id.includes('jsonld')) {
+    return deltaIfFlipped(
+      ['tc_hasJsonLd'],
+      0.20, { tc_hasJsonLd: 12 }, 20,
+    );
+  }
+
+  // Entity alignment: Terminology / specificity
+  if (id.includes('specific') || id.includes('terminolog') || id.includes('language') || id.includes('generic') || id.includes('vague')) {
+    return deltaIfFlipped(
+      ['ea_usesSpecificTerminology'],
+      0.15, { ea_usesSpecificTerminology: 10 }, 25,
+    );
+  }
+
+  // Hero / H1 clarity — hero sections often affect entity alignment + content structure
+  if (st === 'hero' || id.includes('hero') || id.includes('sharpen') || id.includes('h1') || id.includes('headline')) {
+    return deltaIfFlipped(
+      ['ea_businessNameInH1OrFirstPara', 'cs_hasAnswerCapsule'],
+      0.15, { ea_businessNameInH1OrFirstPara: 5 }, 25,
+    ) + deltaIfFlipped(
+      ['cs_hasAnswerCapsule'],
+      0.30, { cs_hasAnswerCapsule: 15 }, 40,
+    );
+  }
+
+  // CTA sections — internal links help entity alignment
+  if (st === 'cta' || id.includes('cta') || id.includes('call-to-action') || id.includes('conversion')) {
+    return deltaIfFlipped(
+      ['ea_hasInternalLinks'],
+      0.15, { ea_hasInternalLinks: 5 }, 25,
+    );
+  }
+
+  // Geographic / audience targeting
+  if (id.includes('local') || id.includes('geographic') || id.includes('audience') || id.includes('location') || id.includes('target')) {
+    return deltaIfFlipped(
+      ['ea_hasGeographicOrAudienceTargeting'],
+      0.15, { ea_hasGeographicOrAudienceTargeting: 2 }, 25,
+    );
+  }
+
+  // Fallback: no recognisable pattern → 0
+  return 0;
 }
 
 // ─── AI Strategist ────────────────────────────────────────────────────────────

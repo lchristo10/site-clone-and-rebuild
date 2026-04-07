@@ -85,6 +85,19 @@ function RecCard({ rec, onUpdate, onApply, applying, applyResult, applyError }: 
           </p>
           <p className="text-[10px] font-mono text-muted-foreground/50 mt-0.5 capitalize">{rec.sectionType} section</p>
         </div>
+        {/* Expected score gain badge */}
+        {rec.expectedScoreGain !== undefined && rec.expectedScoreGain > 0 && !isApplied && !isSettled && (
+          <span
+            className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border flex-shrink-0 mt-0.5 ${
+              rec.expectedScoreGain >= 4
+                ? 'text-alias-green border-alias-green/30 bg-alias-green/5'
+                : 'text-alias-amber border-alias-amber/30 bg-alias-amber/5'
+            }`}
+            title={`Applying this adds ~${rec.expectedScoreGain} AEO points`}
+          >
+            +{rec.expectedScoreGain} pts
+          </span>
+        )}
         <span className="text-[10px] flex-shrink-0 mt-0.5">
           {applying   ? <span className="animate-spin inline-block">⟳</span> :
            isApplied  ? '✓' :
@@ -132,6 +145,43 @@ function RecCard({ rec, onUpdate, onApply, applying, applyResult, applyError }: 
       {expanded && !applying && !isApplied && (
         <div className="px-4 pb-4 space-y-3">
           <p className="text-[10px] font-mono text-foreground/70 leading-relaxed">{rec.rationale}</p>
+
+          {/* Expected AEO score impact */}
+          {rec.expectedScoreGain !== undefined && (
+            <div className="flex items-center gap-3 px-3 py-2 rounded border border-border/30 bg-muted/10">
+              <div className="flex-shrink-0">
+                <p className="text-[9px] font-mono uppercase tracking-[0.15em] text-muted-foreground/40 mb-1">
+                  Expected AEO impact
+                </p>
+                <div className="flex items-baseline gap-1.5">
+                  <span className={`text-[20px] font-mono font-bold tabular-nums leading-none ${
+                    rec.expectedScoreGain >= 4 ? 'text-alias-green' :
+                    rec.expectedScoreGain >= 1 ? 'text-alias-amber' :
+                    'text-muted-foreground/40'
+                  }`}>
+                    {rec.expectedScoreGain > 0 ? `+${rec.expectedScoreGain}` : '—'}
+                  </span>
+                  {rec.expectedScoreGain > 0 && (
+                    <span className="text-[9px] font-mono text-muted-foreground/40">pts</span>
+                  )}
+                </div>
+              </div>
+              {/* Mini bar */}
+              {rec.expectedScoreGain > 0 && (
+                <div className="flex-1 h-1.5 bg-border/20 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-700"
+                    style={{
+                      width: `${Math.min((rec.expectedScoreGain / 10) * 100, 100)}%`,
+                      background: rec.expectedScoreGain >= 4
+                        ? 'oklch(0.72 0.2 145)'
+                        : 'oklch(0.78 0.18 75)',
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="px-3 py-2 rounded border border-border/30 bg-muted/20">
             <p className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground/50 mb-1">Suggested action</p>
@@ -295,7 +345,8 @@ export function StrategistPanel({
         {isLoading && (
           <div className="flex flex-col items-center justify-center py-8 gap-3">
             <div className="w-1.5 h-1.5 rounded-full bg-alias-green animate-pulse" />
-            <p className="text-[10px] font-mono text-alias-green/60 uppercase tracking-[0.2em]">Reviewing rebuilt site…</p>
+            <p className="text-[10px] font-mono text-alias-green/60 uppercase tracking-[0.2em]">Re-scoring rebuilt site…</p>
+            <p className="text-[10px] font-mono text-muted-foreground/30">takes ~10–15s</p>
           </div>
         )}
 

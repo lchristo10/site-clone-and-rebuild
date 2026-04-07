@@ -121,6 +121,11 @@
   50% { background-position: 100% 50%; }
 }
 
+@keyframes power-meter-pulse {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.4; }
+}
+
 .animate-terminal-blink {
   animation: terminal-blink 1s step-end infinite;
 }

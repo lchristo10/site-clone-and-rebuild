@@ -40,9 +40,9 @@ export function AeoScoreRing({ score, label, size = 'md', tooltip }: ScoreRingPr
   }, [score]);
 
   const configs = {
-    sm: { viewBox: 80, r: 28, stroke: 6, fontSize: 18, labelSize: 8, cx: 40, cy: 40 },
-    md: { viewBox: 120, r: 44, stroke: 8, fontSize: 28, labelSize: 10, cx: 60, cy: 60 },
-    lg: { viewBox: 160, r: 60, stroke: 10, fontSize: 40, labelSize: 12, cx: 80, cy: 80 },
+    sm: { viewBox: 100, r: 36, stroke: 7, fontSize: 22, labelSize: 9, cx: 50, cy: 50 },
+    md: { viewBox: 130, r: 50, stroke: 9, fontSize: 32, labelSize: 11, cx: 65, cy: 65 },
+    lg: { viewBox: 200, r: 80, stroke: 12, fontSize: 52, labelSize: 13, cx: 100, cy: 100 },
   };
 
   const c = configs[size];
@@ -186,11 +186,11 @@ export function AeoScoreGrid({ overall, content_structure, eeat, technical, enti
       <div className="w-px self-stretch bg-border/30 flex-shrink-0" />
 
       {/* Sub-scores — 2×2 right */}
-      <div className="flex-1 grid grid-cols-2 gap-x-2 gap-y-3">
-        <AeoScoreRing score={content_structure} label="Content Structure" size="sm" tooltip={AEO_TOOLTIPS['Content Structure']} />
-        <AeoScoreRing score={eeat}              label="E-E-A-T"           size="sm" tooltip={AEO_TOOLTIPS['E-E-A-T']} />
-        <AeoScoreRing score={technical}         label="Technical"         size="sm" tooltip={AEO_TOOLTIPS['Technical']} />
-        <AeoScoreRing score={entity_alignment}  label="Entity Align"      size="sm" tooltip={AEO_TOOLTIPS['Entity Align']} />
+      <div className="flex-1 grid grid-cols-2 gap-x-4 gap-y-4">
+        <AeoScoreRing score={content_structure} label="Content Structure" size="md" tooltip={AEO_TOOLTIPS['Content Structure']} />
+        <AeoScoreRing score={eeat}              label="E-E-A-T"           size="md" tooltip={AEO_TOOLTIPS['E-E-A-T']} />
+        <AeoScoreRing score={technical}         label="Technical"         size="md" tooltip={AEO_TOOLTIPS['Technical']} />
+        <AeoScoreRing score={entity_alignment}  label="Entity Align"      size="md" tooltip={AEO_TOOLTIPS['Entity Align']} />
       </div>
     </div>
   );

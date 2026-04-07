@@ -202,6 +202,12 @@ export interface StrategistRecommendation {
   suggestedAction: string;
   status: RecommendationStatus;
   userComment?: string;
+  /**
+   * Deterministic AEO overall-score point gain (0-100) if this recommendation
+   * is applied — computed from the checklist weights, not estimated by AI.
+   * 0 means the targeted signal is already passing.
+   */
+  expectedScoreGain?: number;
 }
 
 export interface StrategistReport {

@@ -5,6 +5,7 @@ import { AeoScoreGrid } from '@/components/aeo-score-ring';
 import { StrategistPanel } from '@/components/strategist-panel';
 import { FeedbackBar } from '@/components/feedback-bar';
 import { SiteStructureTab } from '@/components/site-structure-tab';
+import { AeoPowerMeter } from '@/components/aeo-power-meter';
 import { StrategistReport, SitePlan, AeoScore, AeoChecklist, BrandDNA } from '@/lib/types';
 import { buildBrandOverrideCss, brandDnaToGoogleFontsUrl } from '@/lib/brand-dna';
 
@@ -214,8 +215,14 @@ export default function PreviewPage({ params }: Props) {
     try {
       const res = await fetch(`/api/clone/analyse/${jobId}`, { method: 'POST' });
       if (res.ok) {
-        const data = await res.json() as { report: StrategistReport };
+        const data = await res.json() as { report: StrategistReport; freshScore?: AeoScore };
         setStrategistReport(data.report);
+        // Sync the re-audited score so the Power Meter and AEO Report update immediately
+        if (data.freshScore) {
+          setScore(data.freshScore);
+          setRecommendations(data.freshScore.recommendations || []);
+          setAiSummary(data.freshScore.aiSummary || '');
+        }
       }
     } finally {
       setStrategistLoading(false);
@@ -304,6 +311,13 @@ export default function PreviewPage({ params }: Props) {
   }, [jobId, editedDna]);
 
   const donePagesCount = pages.filter(p => p.status === 'done').length;
+
+  // ── Power Meter derived values ───────────────────────────────────
+  const pendingGain = strategistReport
+    ? strategistReport.recommendations
+        .filter(r => r.status === 'pending' || r.status === 'accepted')
+        .reduce((sum, r) => sum + (r.expectedScoreGain ?? 0), 0)
+    : 0;
 
   return (
     <main className="min-h-screen bg-background flex flex-col">
@@ -1061,6 +1075,15 @@ export default function PreviewPage({ params }: Props) {
             onClick={() => setStrategistOpen(false)}
           />
         )}
+
+        {/* AEO Power Meter — fixed viewport right, shifts left when drawer is open */}
+        <AeoPowerMeter
+          score={score?.overall}
+          originalScore={originalScore?.overall}
+          pendingGain={pendingGain}
+          isLoading={strategistLoading}
+          drawerOpen={strategistOpen}
+        />
 
         {/* Drawer */}
         <div className={`fixed top-[49px] right-0 bottom-0 z-50 w-[420px] max-w-[92vw] flex flex-col

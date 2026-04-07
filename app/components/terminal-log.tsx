@@ -174,25 +174,25 @@ function MilestoneRow({ milestone, isActive }: { milestone: Milestone; isActive:
   const duration = completedAt && startedAt ? fmtDuration(completedAt - startedAt) : null;
 
   return (
-    <div className={`flex items-start gap-3 py-2.5 transition-all duration-500 ${
+    <div className={`flex items-start gap-3 py-3 transition-all duration-500 ${
       status === 'pending' ? 'opacity-30' : 'opacity-100'
     }`}>
       {/* Status icon */}
-      <div className={`w-6 h-6 rounded border flex items-center justify-center flex-shrink-0 mt-0.5 transition-all duration-500 ${
+      <div className={`w-7 h-7 rounded border flex items-center justify-center flex-shrink-0 mt-0.5 transition-all duration-500 ${
         status === 'done'    ? 'bg-alias-green-dim border-alias-green/40 text-alias-green' :
         status === 'running' ? 'border-alias-green/50 text-alias-green' :
         status === 'error'   ? 'border-alias-red/40 text-alias-red' :
         'border-border/30 text-muted-foreground/30'
       }`}>
-        {status === 'done'    && <span className="text-[10px]">✓</span>}
-        {status === 'running' && <span className="text-[10px] animate-terminal-blink font-mono">◆</span>}
-        {status === 'error'   && <span className="text-[10px]">✗</span>}
-        {status === 'pending' && <span className="text-[10px] font-mono text-muted-foreground/20">{icon}</span>}
+        {status === 'done'    && <span className="text-[12px]">✓</span>}
+        {status === 'running' && <span className="text-[12px] animate-terminal-blink font-mono">◆</span>}
+        {status === 'error'   && <span className="text-[12px]">✗</span>}
+        {status === 'pending' && <span className="text-[12px] font-mono text-muted-foreground/20">{icon}</span>}
       </div>
 
       {/* Label + sub-text */}
       <div className="flex-1 min-w-0">
-        <p className={`text-[14px] font-mono font-semibold uppercase tracking-[0.1em] leading-none transition-colors duration-300 ${
+        <p className={`text-[16px] font-mono font-semibold uppercase tracking-[0.1em] leading-none transition-colors duration-300 ${
           status === 'done'    ? 'text-foreground/80' :
           status === 'running' ? 'text-foreground' :
           status === 'error'   ? 'text-alias-red' :
@@ -203,14 +203,14 @@ function MilestoneRow({ milestone, isActive }: { milestone: Milestone; isActive:
 
         {/* Active status line — updates in place */}
         {status === 'running' && activeText && (
-          <p className="text-[10px] font-mono text-alias-green/70 mt-1 leading-none animate-fade-in-up">
+          <p className="text-[12px] font-mono text-alias-green/70 mt-1.5 leading-none animate-fade-in-up">
             {activeText}
           </p>
         )}
 
         {/* Completed summary */}
         {status === 'done' && completedText && (
-          <p className="text-[10px] font-mono text-muted-foreground/40 mt-1 leading-none">
+          <p className="text-[12px] font-mono text-muted-foreground/40 mt-1.5 leading-none">
             {completedText}
           </p>
         )}
@@ -218,13 +218,13 @@ function MilestoneRow({ milestone, isActive }: { milestone: Milestone; isActive:
 
       {/* Duration badge */}
       {status === 'done' && duration && (
-        <span className="text-[10px] font-mono text-muted-foreground/30 flex-shrink-0 mt-1">{duration}</span>
+        <span className="text-[12px] font-mono text-muted-foreground/30 flex-shrink-0 mt-1">{duration}</span>
       )}
 
       {/* Pulse while active */}
       {status === 'running' && (
-        <div className="flex-shrink-0 mt-1.5">
-          <div className="w-1.5 h-1.5 rounded-full bg-alias-green animate-pulse" />
+        <div className="flex-shrink-0 mt-2">
+          <div className="w-2 h-2 rounded-full bg-alias-green animate-pulse" />
         </div>
       )}
     </div>
@@ -235,12 +235,12 @@ function MilestoneRow({ milestone, isActive }: { milestone: Milestone; isActive:
 
 function ToastItem({ toast }: { toast: Toast }) {
   return (
-    <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border border-alias-green/20 bg-alias-green/5 transition-all duration-400 ${
+    <div className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border border-alias-green/20 bg-alias-green/5 transition-all duration-400 ${
       toast.exiting ? 'opacity-0 translate-x-4 scale-95' : 'opacity-100 translate-x-0 scale-100'
     }`}
       style={{ transitionProperty: 'opacity, transform' }}>
-      <span className="text-alias-green/60 text-[10px] flex-shrink-0">{toast.icon}</span>
-      <p className="text-[10px] font-mono text-foreground/70 leading-tight">{toast.text}</p>
+      <span className="text-alias-green/60 text-[12px] flex-shrink-0">{toast.icon}</span>
+      <p className="text-[12px] font-mono text-foreground/70 leading-tight">{toast.text}</p>
     </div>
   );
 }
@@ -459,43 +459,43 @@ export function TerminalLog({ jobId, onComplete }: TerminalLogProps) {
     <div className="h-full flex flex-col gap-4">
 
       {/* ── Main panel ──────────────────────────────────────────────────────── */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4 min-h-0">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-4 min-h-0">
 
         {/* Left: milestone engine panel */}
         <div className="bg-card border border-border rounded-lg flex flex-col min-h-0 overflow-hidden">
 
           {/* Chrome bar */}
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-border/50 flex-shrink-0">
+          <div className="flex items-center gap-2 px-5 py-3.5 border-b border-border/50 flex-shrink-0">
             <div className="flex gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-red-500/50" />
-              <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/50" />
-              <div className="w-2.5 h-2.5 rounded-full bg-green-500/50" />
+              <div className="w-3 h-3 rounded-full bg-red-500/50" />
+              <div className="w-3 h-3 rounded-full bg-yellow-500/50" />
+              <div className="w-3 h-3 rounded-full bg-green-500/50" />
             </div>
             <div className="flex-1 flex items-center justify-between ml-3">
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
+                <span className="text-[12px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
                   ALIAS
                 </span>
                 {sourceUrl ? (
                   <>
-                    <span className="text-muted-foreground/30 font-mono text-[10px]">for</span>
-                    <span className="text-[10px] font-mono text-foreground/70 truncate max-w-[240px]">
+                    <span className="text-muted-foreground/30 font-mono text-[12px]">for</span>
+                    <span className="text-[12px] font-mono text-foreground/70 truncate max-w-[280px]">
                       {sourceUrl.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}
                     </span>
                   </>
                 ) : (
-                  <span className="text-[10px] font-mono text-muted-foreground/40 uppercase tracking-[0.2em]">compiler</span>
+                  <span className="text-[12px] font-mono text-muted-foreground/40 uppercase tracking-[0.2em]">compiler</span>
                 )}
               </div>
 
               <div className="flex items-center gap-2">
                 {isDone && (
-                  <span className="text-[10px] font-mono text-alias-green uppercase tracking-wider">
+                  <span className="text-[12px] font-mono text-alias-green uppercase tracking-wider">
                     ● complete {totalDuration && `· ${totalDuration}`}
                   </span>
                 )}
                 {!isDone && !error && activeCount > 0 && (
-                  <span className="text-[10px] font-mono text-alias-amber uppercase tracking-wider animate-pulse">
+                  <span className="text-[12px] font-mono text-alias-amber uppercase tracking-wider animate-pulse">
                     ● running
                   </span>
                 )}
@@ -504,20 +504,20 @@ export function TerminalLog({ jobId, onComplete }: TerminalLogProps) {
           </div>
 
           {/* Milestone list — compact when done+score, scrollable otherwise */}
-          <div className={`px-5 py-4 ${isDone && score ? 'flex-shrink-0 border-b border-border/30' : 'flex-1 overflow-y-auto'}`}>
+          <div className={`px-6 py-5 ${isDone && score ? 'flex-shrink-0 border-b border-border/30' : 'flex-1 overflow-y-auto'}`}>
 
             {/* Progress bar — hide when complete */}
             {!isDone && (
-              <div className="mb-5">
-                <div className="flex items-center justify-between mb-1.5">
-                  <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground/50">
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[12px] font-mono uppercase tracking-[0.2em] text-muted-foreground/50">
                     Pipeline Progress
                   </p>
-                  <p className="text-[10px] font-mono text-muted-foreground/40">
+                  <p className="text-[12px] font-mono text-muted-foreground/40">
                     {activeCount}/{milestones.length}
                   </p>
                 </div>
-                <div className="h-px bg-border/30 rounded-full overflow-hidden">
+                <div className="h-0.5 bg-border/30 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-alias-green/60 transition-all duration-700 ease-out"
                     style={{ width: `${(activeCount / milestones.length) * 100}%` }}
@@ -539,15 +539,15 @@ export function TerminalLog({ jobId, onComplete }: TerminalLogProps) {
 
             {/* Error state */}
             {error && (
-              <div className="mt-4 px-3 py-2.5 rounded-lg border border-alias-red/30 bg-alias-red/5">
-                <p className="text-[10px] font-mono text-alias-red">{error}</p>
+              <div className="mt-5 px-4 py-3 rounded-lg border border-alias-red/30 bg-alias-red/5">
+                <p className="text-[12px] font-mono text-alias-red">{error}</p>
               </div>
             )}
 
             {/* Toast stack — during running, below milestones */}
             {toasts.length > 0 && (
-              <div className="mt-5 space-y-1.5">
-                <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground/30 mb-2">
+              <div className="mt-6 space-y-2">
+                <p className="text-[12px] font-mono uppercase tracking-[0.2em] text-muted-foreground/30 mb-2">
                   Discoveries
                 </p>
                 {toasts.map(t => <ToastItem key={t.id} toast={t} />)}
@@ -557,8 +557,8 @@ export function TerminalLog({ jobId, onComplete }: TerminalLogProps) {
 
           {/* AEO Score — docked to bottom of left panel when done */}
           {isDone && score && (
-            <div className="flex-1 p-4 overflow-y-auto min-h-0 animate-fade-in-up">
-              <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground mb-3">AEO Audit Score</p>
+            <div className="flex-1 p-5 overflow-y-auto min-h-0 animate-fade-in-up">
+              <p className="text-[12px] font-mono uppercase tracking-[0.2em] text-muted-foreground mb-4">AEO Audit Score</p>
               <AeoScoreGrid
                 overall={score.overall}
                 content_structure={score.content_structure}
@@ -576,13 +576,13 @@ export function TerminalLog({ jobId, onComplete }: TerminalLogProps) {
           {/* Screenshot */}
           {screenshotUrl && (
             <div className="bg-card border border-border rounded-lg overflow-hidden flex-shrink-0">
-              <div className="px-3 py-2 border-b border-border/50">
-                <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">Original Site</p>
+              <div className="px-4 py-3 border-b border-border/50">
+                <p className="text-[12px] font-mono uppercase tracking-[0.2em] text-muted-foreground">Original Site</p>
               </div>
-              <div className="relative aspect-video overflow-hidden">
+              <div className="relative overflow-hidden" style={{ aspectRatio: '16/10' }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={screenshotUrl} alt="Original site screenshot"
-                  className="w-full h-full object-cover object-top" />
+                  className="w-full h-full object-cover object-left-top" />
                 <div className="absolute inset-0 scanlines pointer-events-none" />
               </div>
             </div>
@@ -590,11 +590,11 @@ export function TerminalLog({ jobId, onComplete }: TerminalLogProps) {
 
           {/* Token preview */}
           {tokens && entityMap && (
-            <div className="bg-card border border-border rounded-lg p-4 flex-shrink-0 overflow-y-auto max-h-[400px]">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">Extracted Tokens</p>
+            <div className="bg-card border border-border rounded-lg p-5 flex-shrink-0 overflow-y-auto max-h-[600px]">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-[12px] font-mono uppercase tracking-[0.2em] text-muted-foreground">Extracted Tokens</p>
                 {colorsSaveStatus !== 'idle' && (
-                  <span className={`text-[10px] font-mono transition-colors ${
+                  <span className={`text-[12px] font-mono transition-colors ${
                     colorsSaveStatus === 'saving' ? 'text-alias-amber animate-pulse' :
                     colorsSaveStatus === 'saved'  ? 'text-alias-green' :
                     'text-alias-red'
@@ -609,8 +609,8 @@ export function TerminalLog({ jobId, onComplete }: TerminalLogProps) {
 
           {/* AEO Score — right column only during running (before done) */}
           {!isDone && score && (
-            <div className="bg-card border border-border rounded-lg p-4 flex-shrink-0">
-              <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground mb-3">AEO Audit Score</p>
+            <div className="bg-card border border-border rounded-lg p-5 flex-shrink-0">
+              <p className="text-[12px] font-mono uppercase tracking-[0.2em] text-muted-foreground mb-4">AEO Audit Score</p>
               <AeoScoreGrid
                 overall={score.overall}
                 content_structure={score.content_structure}
@@ -624,21 +624,25 @@ export function TerminalLog({ jobId, onComplete }: TerminalLogProps) {
       </div>
 
 
-      {/* ── Action buttons — shown when done ───────────────────────────── */}
+      {/* Action buttons — shown when done */}
       {isDone && (
-        <div className="flex gap-3 flex-shrink-0 animate-fade-in-up">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-4 flex-shrink-0 animate-fade-in-up">
+          {/* Left col: Preview — same width as pipeline panel */}
           <a href={`/preview/${jobId}`}
-            className="flex-1 flex items-center justify-center gap-2 py-3 border border-alias-green text-alias-green bg-alias-green-dim rounded-lg text-sm font-mono uppercase tracking-wider hover:bg-alias-green/20 transition-colors">
+            className="flex items-center justify-center gap-2 py-3.5 border border-alias-green text-alias-green bg-alias-green-dim rounded-lg text-[14px] font-mono uppercase tracking-wider hover:bg-alias-green/20 transition-colors">
             <span>◈</span> Preview Rebuilt Site
           </a>
-          <a href={`/code/${jobId}`}
-            className="flex items-center justify-center gap-2 px-4 py-3 border border-border text-muted-foreground bg-card rounded-lg text-sm font-mono uppercase tracking-wider hover:text-foreground hover:border-foreground/30 transition-colors">
-            {'</>'} View Code
-          </a>
-          <a href={`/api/clone/download/${jobId}`}
-            className="flex items-center justify-center gap-2 px-4 py-3 border border-border text-muted-foreground bg-card rounded-lg text-sm font-mono uppercase tracking-wider hover:text-foreground hover:border-foreground/30 transition-colors">
-            ↓ Download ZIP
-          </a>
+          {/* Right col: View Code + Download ZIP — same total width as right data panel */}
+          <div className="flex gap-3">
+            <a href={`/code/${jobId}`}
+              className="flex-1 flex items-center justify-center gap-2 py-3.5 border border-border text-muted-foreground bg-card rounded-lg text-[14px] font-mono uppercase tracking-wider hover:text-foreground hover:border-foreground/30 transition-colors">
+              {'</>'} View Code
+            </a>
+            <a href={`/api/clone/download/${jobId}`}
+              className="flex-1 flex items-center justify-center gap-2 py-3.5 border border-border text-muted-foreground bg-card rounded-lg text-[14px] font-mono uppercase tracking-wider hover:text-foreground hover:border-foreground/30 transition-colors">
+              ↓ Download ZIP
+            </a>
+          </div>
         </div>
       )}
     </div>
