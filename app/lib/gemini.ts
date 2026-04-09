@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
-import { AeoChecklist, AeoContent, AeoScore, AeoStrategy, DesignTokens, EntityMap, SitePersona } from './types';
+import { AeoChecklist, AeoContent, AeoScore, AeoStrategy, DesignTokens, EntityMap, RealSiteContent, SitePersona } from './types';
 
 let genAI: GoogleGenerativeAI | null = null;
 
@@ -349,6 +349,8 @@ export async function generateAeoContent(
   pageTitle?: string,          // e.g. "Services", "About", "FAQ"
   pageIntent?: string,         // the site planner's intent for this page
   crossPageOwnership?: Record<string, string>, // Option A: { sectionType -> owningPageTitle }
+  originalChecklist?: AeoChecklist,  // binary audit of original site — drives content mandates
+  realSiteContent?: RealSiteContent, // real extracted content to use verbatim
 ): Promise<AeoContent> {
   const model = getClient().getGenerativeModel({
     model: 'gemini-2.5-flash',
@@ -385,6 +387,7 @@ export async function generateAeoContent(
 
   const objectiveBlock = OBJECTIVE_GUIDANCE[siteObjective] ?? OBJECTIVE_GUIDANCE['other'];
   const personaBlock = buildPersonaGuidance(sitePersona);
+  const mandateBlock = buildAeoMandateBlock(originalChecklist, realSiteContent);
 
   // ── Blueprint block — page-aware instruction ──────────────────────────────────
   const blueprintBlock = plannedSections && plannedSections.length > 0
@@ -439,6 +442,7 @@ export async function generateAeoContent(
   const prompt = `You are an AEO (Answer Engine Optimization) expert rebuilding a website for maximum AI visibility.
 
 ${pageContextBlock}
+${mandateBlock}
 
 ORIGINAL SITE METADATA:
 - Title: ${originalMeta.title || 'Unknown'}
@@ -490,6 +494,198 @@ CRITICAL OUTPUT RULES — JSON fields only, no exceptions:
 
   const result = await model.generateContent(prompt);
   return JSON.parse(result.response.text()) as AeoContent;
+}
+
+
+// ─── Real content extractor ───────────────────────────────────────────────────
+
+/**
+ * Extracts real E-E-A-T signals from the original site's scraped markdown.
+ * Uses temperature=0 and a strict schema so it only surfaces what's genuinely
+ * present — empty arrays are the correct return when content doesn't exist.
+ *
+ * Designed to run BEFORE content generation so generateAeoContent() can inject
+ * real testimonials, staff names, stats, etc. rather than fabricating them.
+ */
+export async function extractRealSiteContent(markdown: string): Promise<RealSiteContent> {
+  const model = getClient().getGenerativeModel({
+    model: 'gemini-2.5-flash',
+    generationConfig: {
+      temperature: 0,
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: SchemaType.OBJECT,
+        properties: {
+          testimonials:  { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+          staffMembers:  { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+          stats:         { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+          trustSignals:  { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+          services:      { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+          locations:     { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+        },
+        required: ['testimonials', 'staffMembers', 'stats', 'trustSignals', 'services', 'locations'],
+      },
+    },
+  });
+
+  const prompt = `You are an AEO content analyst. Extract specific, verbatim E-E-A-T signals from this website markdown.
+
+CRITICAL RULES:
+- Return ONLY content that is EXPLICITLY present in the markdown below.
+- Return EMPTY arrays for categories where nothing is found. Do NOT invent or infer.
+- Prefer verbatim quotes and exact phrasings from the source text.
+
+EXTRACT THE FOLLOWING:
+
+testimonials:
+  Client reviews, quotes, or testimonials — include the quote text and any attribution.
+  Format: "[Quote text]" — [Client name/initials if given]
+  Example: "Best salon in Auckland, would recommend to everyone!" — Sarah M.
+
+staffMembers:
+  Named team members with their role and any credentials or experience mentioned.
+  Format: [Name] — [Role], [Credential/experience if given]
+  Example: Jessica — Senior Colourist, Schwarzkopf certified
+
+stats:
+  Specific quantitative claims — years in business, client counts, ratings, team size, etc.
+  Format: the exact claim as it appears, e.g. "Over 500 satisfied clients", "15 years experience"
+
+trustSignals:
+  Certifications, awards, industry memberships, guarantees, partner brands.
+  Example: "Schwarzkopf Professional partner", "Winner Best Auckland Salon 2023"
+
+services:
+  Specific named services with any details (pricing, duration, description).
+  Format: [Service name] — [detail if given]
+  Example: Balayage — from $180, 2-3 hour appointment
+
+locations:
+  Geographic locations served or audience segments explicitly named.
+  Example: "Newmarket, Auckland", "serving Parnell and Epsom clients"
+
+MARKDOWN CONTENT:
+${markdown.substring(0, 20000)}
+
+Return only valid JSON. Empty arrays are correct when no content is found for a category.`;
+
+  const result = await model.generateContent(prompt);
+  return JSON.parse(result.response.text()) as RealSiteContent;
+}
+
+
+// ─── AEO Mandate Block Builder ────────────────────────────────────────────────
+
+/**
+ * Builds a hard-mandate block for the generateAeoContent prompt.
+ * Maps false checklist flags → specific content requirements that Gemini MUST satisfy.
+ * When realSiteContent is supplied, injects the actual extracted content to use.
+ * This closes the gap between the AI Strategist's post-hoc recommendations
+ * and the first-generation site output.
+ */
+function buildAeoMandateBlock(
+  cl?: AeoChecklist,
+  rc?: RealSiteContent,
+): string {
+  if (!cl) return '';
+
+  const mandates: string[] = [];
+
+  // ── E-E-A-T mandates ───────────────────────────────────────────────────────
+
+  if (!cl.ee_hasNamedPeopleOrCredentials) {
+    const real = rc?.staffMembers.length
+      ? `USE THIS REAL CONTENT → ${rc.staffMembers.slice(0, 3).join(' | ')}`
+      : `No named staff found in source. Describe team composition specifically instead (e.g. "our 4 certified stylists" or "our team of licensed practitioners").`;
+    mandates.push(
+      `✗ MISSING — Named staff / credentials\n` +
+      `  MANDATE: Include at least one real person\'s name with their specific role and qualification in the about or features section.\n` +
+      `  ${real}`,
+    );
+  }
+
+  if (!cl.ee_hasTestimonialsOrReviews) {
+    const real = rc?.testimonials.length
+      ? `USE THIS REAL CONTENT → ${rc.testimonials.slice(0, 2).join(' | ')}`
+      : `No testimonials found in source. Write 1-2 representative, specific testimonials for the type of service offered — avoid generic praise like "great service".`;
+    mandates.push(
+      `✗ MISSING — Client testimonials / reviews\n` +
+      `  MANDATE: Include at least one attributed client quote in the testimonials section.\n` +
+      `  ${real}`,
+    );
+  }
+
+  if (!cl.ee_hasSpecificStats) {
+    const real = rc?.stats.length
+      ? `USE THIS REAL CONTENT → ${rc.stats.slice(0, 3).join(' | ')}`
+      : `No stats found in source. Include a conservative, reasonable quantitative claim based on context (years operating, team size, approximate client volume).`;
+    mandates.push(
+      `✗ MISSING — Specific numbers / stats\n` +
+      `  MANDATE: Include at least one concrete quantitative claim (years, client count, rating, etc.).\n` +
+      `  ${real}`,
+    );
+  }
+
+  if (!cl.ee_hasCertificationsOrTrust) {
+    const real = rc?.trustSignals.length
+      ? `USE THIS REAL CONTENT → ${rc.trustSignals.slice(0, 3).join(' | ')}`
+      : `No trust signals found in source. Include a trust statement relevant to the business type (e.g. industry-standard certifications, satisfaction guarantee, professional affiliations).`;
+    mandates.push(
+      `✗ MISSING — Trust signals / certifications\n` +
+      `  MANDATE: Include trust signals in the hero, about, or features section.\n` +
+      `  ${real}`,
+    );
+  }
+
+  // ── Content structure mandates ─────────────────────────────────────────────
+
+  if (!cl.cs_hasQuestionDrivenHeadings) {
+    mandates.push(
+      `✗ MISSING — Question-driven headings\n` +
+      `  MANDATE: At least one section heading (H2 or H3) MUST begin with a question word: What, How, Why, Which, Is, Are, Can, Do, Does, Should.`,
+    );
+  }
+
+  if (!cl.cs_hasAnswerCapsule) {
+    mandates.push(
+      `✗ MISSING — Answer capsule / inverted pyramid\n` +
+      `  MANDATE: The first substantive section must open with a 40-60 word direct answer paragraph stating what this business does and for whom, before any descriptive detail.`,
+    );
+  }
+
+  if (!cl.cs_hasListsOrTables) {
+    mandates.push(
+      `✗ MISSING — Machine-readable lists\n` +
+      `  MANDATE: At least one section MUST use isList:true with bullet listItems (services, features, process steps, or FAQ pairs).`,
+    );
+  }
+
+  // ── Entity / geographic mandate ────────────────────────────────────────────
+
+  if (!cl.ea_hasGeographicOrAudienceTargeting) {
+    const real = rc?.locations.length
+      ? `USE THIS REAL CONTENT → locations: ${rc.locations.join(', ')}`
+      : `No specific location found. Include audience targeting in H1 or opening paragraph (e.g. "for [audience type]" or the city/region if inferable from context).`;
+    mandates.push(
+      `✗ MISSING — Geographic / audience targeting\n` +
+      `  MANDATE: Name the location served OR the specific target audience in the H1 or first paragraph.\n` +
+      `  ${real}`,
+    );
+  }
+
+  if (mandates.length === 0) return '';
+
+  return `
+
+AEO CONTENT MANDATES — NON-NEGOTIABLE:
+The following signals are ABSENT from the original site. You MUST address EVERY item below in the
+content you generate. Each mandate is a direct requirement, not a suggestion.
+Where real extracted content is provided, you MUST use it verbatim or as a close rewrite.
+
+${mandates.join('\n\n')}
+
+COMPLIANCE IS REQUIRED across all sections you generate. Do not skip any mandate.
+`;
 }
 
 

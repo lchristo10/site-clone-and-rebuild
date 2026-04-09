@@ -253,6 +253,7 @@ export function TerminalLog({ jobId, onComplete }: TerminalLogProps) {
   const [tokens, setTokens] = useState<DesignTokens | null>(null);
   const [entityMap, setEntityMap] = useState<EntityMap | null>(null);
   const [score, setScore] = useState<AeoScore | null>(null);
+  const [originalScore, setOriginalScore] = useState<AeoScore | null>(null);
   const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
   const [isDone, setIsDone] = useState(false);
@@ -317,6 +318,8 @@ export function TerminalLog({ jobId, onComplete }: TerminalLogProps) {
           if (data.phases?.analyze?.tokens)    setTokens(data.phases.analyze.tokens);
           if (data.phases?.analyze?.entityMap) setEntityMap(data.phases.analyze.entityMap);
           if (data.phases?.audit?.score)       setScore(data.phases.audit.score);
+          // Hydrate original (pre-rebuild) score from top-level status field
+          if (data.originalScore)              setOriginalScore(data.originalScore as AeoScore);
 
           setIsDone(data.status === 'done');
           isDoneRef.current = data.status === 'done';
@@ -384,10 +387,11 @@ export function TerminalLog({ jobId, onComplete }: TerminalLogProps) {
           if (d.entityMap) setEntityMap(d.entityMap);
         }
         if (event.phase === 'audit' && event.status === 'done' && event.data) {
-          // data is now { score, originalScore } — handle both old and new shape
-          const d = event.data as { score?: AeoScore; overall?: number };
+          // data is { score, originalScore } — handle both old and new shape
+          const d = event.data as { score?: AeoScore; originalScore?: AeoScore; overall?: number };
           const s = d.score ?? (d.overall !== undefined ? d as AeoScore : null);
           if (s) setScore(s);
+          if (d.originalScore) setOriginalScore(d.originalScore);
         }
 
         // ── Generate toasts ──────────────────────────────────────────────────
@@ -556,16 +560,39 @@ export function TerminalLog({ jobId, onComplete }: TerminalLogProps) {
           </div>
 
           {/* AEO Score — docked to bottom of left panel when done */}
-          {isDone && score && (
+          {isDone && (originalScore || score) && (
             <div className="flex-1 p-5 overflow-y-auto min-h-0 animate-fade-in-up">
-              <p className="text-[12px] font-mono uppercase tracking-[0.2em] text-muted-foreground mb-4">AEO Audit Score</p>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-[12px] font-mono uppercase tracking-[0.2em] text-muted-foreground">AEO Audit Score</p>
+                {originalScore && (
+                  <span className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground/40 bg-border/20 px-2 py-0.5 rounded">
+                    Original Site Baseline
+                  </span>
+                )}
+              </div>
               <AeoScoreGrid
-                overall={score.overall}
-                content_structure={score.content_structure}
-                eeat={score.eeat}
-                technical={score.technical}
-                entity_alignment={score.entity_alignment}
+                overall={(originalScore ?? score!).overall}
+                content_structure={(originalScore ?? score!).content_structure}
+                eeat={(originalScore ?? score!).eeat}
+                technical={(originalScore ?? score!).technical}
+                entity_alignment={(originalScore ?? score!).entity_alignment}
               />
+              {originalScore && score && (
+                <div className="mt-4 pt-4 border-t border-border/30">
+                  <p className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground/40 mb-2">Rebuilt Site Score</p>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[28px] font-mono font-bold text-alias-green">{score.overall}</span>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-[11px] font-mono text-alias-green/70">/ 100</span>
+                      {score.overall > originalScore.overall && (
+                        <span className="text-[11px] font-mono text-alias-green">
+                          ↑ +{score.overall - originalScore.overall} pts
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -608,15 +635,22 @@ export function TerminalLog({ jobId, onComplete }: TerminalLogProps) {
           )}
 
           {/* AEO Score — right column only during running (before done) */}
-          {!isDone && score && (
+          {!isDone && (originalScore || score) && (
             <div className="bg-card border border-border rounded-lg p-5 flex-shrink-0">
-              <p className="text-[12px] font-mono uppercase tracking-[0.2em] text-muted-foreground mb-4">AEO Audit Score</p>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-[12px] font-mono uppercase tracking-[0.2em] text-muted-foreground">AEO Audit Score</p>
+                {originalScore && (
+                  <span className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground/40 bg-border/20 px-2 py-0.5 rounded">
+                    Original Baseline
+                  </span>
+                )}
+              </div>
               <AeoScoreGrid
-                overall={score.overall}
-                content_structure={score.content_structure}
-                eeat={score.eeat}
-                technical={score.technical}
-                entity_alignment={score.entity_alignment}
+                overall={(originalScore ?? score!).overall}
+                content_structure={(originalScore ?? score!).content_structure}
+                eeat={(originalScore ?? score!).eeat}
+                technical={(originalScore ?? score!).technical}
+                entity_alignment={(originalScore ?? score!).entity_alignment}
               />
             </div>
           )}

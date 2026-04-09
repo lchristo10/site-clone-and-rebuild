@@ -1,12 +1,12 @@
 import { NextRequest } from 'next/server';
 import { getJob, updateJob, updatePhase, upsertPage } from '@/lib/job-store';
 import { extractPage } from '@/lib/firecrawl';
-import { analyzeDesignTokens, generateAeoContent, generateAeoStrategy, auditAeoScore, generateLayoutCss, normalizeMarkdownToAuditHtml } from '@/lib/gemini';
+import { analyzeDesignTokens, generateAeoContent, generateAeoStrategy, auditAeoScore, generateLayoutCss, normalizeMarkdownToAuditHtml, extractRealSiteContent } from '@/lib/gemini';
 import { generateSitePlan, computeOwnershipMap } from '@/lib/site-planner';
 import { resolveFonts } from '@/lib/font-resolver';
 import { buildHtml } from '@/lib/synthesizer';
 import { extractBrandDna } from '@/lib/brand-dna';
-import { BrandDNA, DesignTokens, EntityMap, PlannedSection, StreamEvent } from '@/lib/types';
+import { BrandDNA, DesignTokens, EntityMap, PlannedSection, RealSiteContent, StreamEvent } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -344,6 +344,8 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
           allPages?: { slug: string; title: string }[],
           pageIntent?: string,
           ownershipMap?: Record<string, string>,
+          originalChecklist?: import('@/lib/types').AeoChecklist,
+          realSiteContent?: RealSiteContent,
         ): Promise<string> => {
           // DRAFT
           emit({ phase: 'draft', status: 'log', message: `[ DRAFT ] Generating content for: ${pageTitle}...` });
@@ -354,6 +356,8 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
             pageTitle,           // ← page identity for content isolation
             pageIntent,          // ← planner's stated purpose for this page
             ownershipMap,        // ← Option A: cross-page content ownership
+            originalChecklist,   // ← checklist gaps → hard content mandates
+            realSiteContent,     // ← real extracted content to use verbatim
           );
           emit({ phase: 'draft', status: 'log', message: `✓ ${pageTitle}: "${aeoContent.h1}" — ${aeoContent.sections.length} sections` });
 
@@ -414,6 +418,90 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
           emit({ phase: 'strategy', status: 'done', message: '[ STRATEGY ] AEO strategy complete.', data: { aeoStrategy } });
         } catch (stratErr) {
           emit({ phase: 'strategy', status: 'log', message: `⚠ Strategy phase error: ${stratErr instanceof Error ? stratErr.message : 'unknown'} — continuing` });
+        }
+
+        // ── E-E-A-T CONTENT EXTRACTION ─────────────────────────────────────────
+        // Pull real testimonials, staff names, stats, trust signals from the scraped
+        // markdown. If key E-E-A-T signals are missing, pre-scrape relevant sub-pages
+        // (e.g. /about, /team) to find the content before homepage synthesis.
+        emit({ phase: 'strategy', status: 'log', message: '[ EXTRACT ] Pulling real E-E-A-T signals from site content...' });
+
+        const originalChecklist = getJob(jobId)?.originalScore?.checklist;
+        let realContentMarkdown = extracted.markdown;
+
+        // Pre-scrape cache: stores pageSlug → scraped data so we reuse it when
+        // building those pages later rather than hitting Firecrawl twice.
+        const preScrapeCache = new Map<string, { markdown: string; meta: { title?: string; description?: string }; html: string }>();
+
+        if (originalChecklist) {
+          const needsStaff = !originalChecklist.ee_hasNamedPeopleOrCredentials;
+          const needsTestimonials = !originalChecklist.ee_hasTestimonialsOrReviews;
+          const needsStats = !originalChecklist.ee_hasSpecificStats;
+
+          // Only pre-scrape if we're actually missing E-E-A-T signals
+          if (needsStaff || needsTestimonials || needsStats) {
+            const pagesToPreScrape: { slug: string; title: string; url: string }[] = [];
+
+            if (needsStaff || needsStats) {
+              // About/Team pages are most likely to contain staff and credentials
+              const aboutPage = navPages.find(p =>
+                /^(about|team|staff|us)$/i.test(p.slug) ||
+                /about|team|staff/i.test(p.title)
+              );
+              if (aboutPage && aboutPage.slug !== 'home') {
+                pagesToPreScrape.push(aboutPage);
+              }
+            }
+
+            if (needsTestimonials) {
+              // Testimonials/Reviews pages
+              const reviewPage = navPages.find(p =>
+                /^(testimonials?|reviews?|clients?)$/i.test(p.slug) ||
+                /testimonial|review/i.test(p.title)
+              );
+              if (reviewPage && reviewPage.slug !== 'home' && !pagesToPreScrape.some(p => p.slug === reviewPage.slug)) {
+                pagesToPreScrape.push(reviewPage);
+              }
+            }
+
+            if (pagesToPreScrape.length > 0) {
+              emit({ phase: 'strategy', status: 'log', message: `[ EXTRACT ] Pre-scraping ${pagesToPreScrape.length} E-E-A-T page(s) for real content...` });
+              for (const p of pagesToPreScrape) {
+                try {
+                  const pageData = await extractPage(p.url);
+                  // Cache for reuse when building this page later — avoids double-scraping
+                  preScrapeCache.set(p.slug, {
+                    markdown: pageData.markdown,
+                    meta: pageData.meta,
+                    html: pageData.html,
+                  });
+                  realContentMarkdown += `\n\n--- ${p.title.toUpperCase()} PAGE ---\n${pageData.markdown}`;
+                  emit({ phase: 'strategy', status: 'log', message: `  ✓ Pre-scraped: ${p.title} (${pageData.markdown.length} chars)` });
+                } catch {
+                  emit({ phase: 'strategy', status: 'log', message: `  ⚠ Could not pre-scrape ${p.title} — skipping` });
+                }
+              }
+            }
+          }
+        }
+
+        let realSiteContent: RealSiteContent | undefined;
+        try {
+          realSiteContent = await extractRealSiteContent(realContentMarkdown);
+          emit({ phase: 'strategy', status: 'log', message:
+            `✓ Real content extracted: ` +
+            `${realSiteContent.staffMembers.length} staff, ` +
+            `${realSiteContent.testimonials.length} testimonials, ` +
+            `${realSiteContent.stats.length} stats, ` +
+            `${realSiteContent.trustSignals.length} trust signals, ` +
+            `${realSiteContent.services.length} services, ` +
+            `${realSiteContent.locations.length} locations`
+          });
+          if (realSiteContent.staffMembers.length > 0) emit({ phase: 'strategy', status: 'log', message: `  • Staff: ${realSiteContent.staffMembers.slice(0, 2).join('; ')}` });
+          if (realSiteContent.testimonials.length > 0) emit({ phase: 'strategy', status: 'log', message: `  • Testimonials: ${realSiteContent.testimonials[0].substring(0, 80)}...` });
+          if (realSiteContent.stats.length > 0) emit({ phase: 'strategy', status: 'log', message: `  • Stats: ${realSiteContent.stats.slice(0, 2).join('; ')}` });
+        } catch (extractErr) {
+          emit({ phase: 'strategy', status: 'log', message: `⚠ Real content extraction failed — continuing without: ${extractErr instanceof Error ? extractErr.message : 'unknown'}` });
         }
 
         // ── PHASE 2.5: PLAN ───────────────────────────────────────────────────
@@ -479,6 +567,8 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
           allSitePagesForNav,
           homePlan?.intent,
           ownershipMap,
+          originalChecklist,
+          realSiteContent,
         );
 
         // buildPage already calls upsertPage with aeoContent — just sync remaining phases
@@ -535,6 +625,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
               let pageMeta: { title?: string; description?: string };
               let pageHtmlSource: string;
 
+              // Use cached pre-scrape data if available (avoids double Firecrawl call)
               if (isPlanOnly) {
                 // No real URL — use homepage content as source material.
                 // The sitePlan section blueprint ensures each page is distinct.
@@ -542,6 +633,13 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
                 pageMeta = { title: page.title, description: entityMap.primaryService };
                 pageHtmlSource = extracted.html;
                 emit({ phase: 'system', status: 'log', message: `  ↻ Synthesising from homepage content (plan-guided sections)` });
+              } else if (preScrapeCache.has(page.slug)) {
+                // Reuse content we already fetched during the E-E-A-T pre-scrape
+                const cached = preScrapeCache.get(page.slug)!;
+                pageMarkdown = cached.markdown;
+                pageMeta = cached.meta;
+                pageHtmlSource = cached.html;
+                emit({ phase: 'system', status: 'log', message: `  ✓ Using pre-scraped content for ${page.title} (${pageMarkdown.length} chars)` });
               } else {
                 const pageExtracted = await extractPage(page.url);
                 pageMarkdown = pageExtracted.markdown;
@@ -560,6 +658,8 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
                 allSitePagesForNav,
                 pagePlan?.intent,
                 ownershipMap,
+                originalChecklist,
+                realSiteContent,
               );
 
               emit({ phase: 'system', status: 'log', message: `  ✓ ${page.title} built: ${pageHtml.length} chars` });

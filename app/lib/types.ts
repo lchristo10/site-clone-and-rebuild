@@ -87,6 +87,27 @@ export interface EntityMap {
   targetAudience: string;
 }
 
+/**
+ * Real E-E-A-T signals extracted from the original site's scraped markdown.
+ * Populated by extractRealSiteContent() after the strategy phase.
+ * Injected into generateAeoContent() so Gemini uses actual site content
+ * instead of fabricating plausible-sounding but inaccurate details.
+ */
+export interface RealSiteContent {
+  /** Direct client quotes or paraphrased reviews with attribution */
+  testimonials: string[];
+  /** Named team members with role and credentials e.g. "Jessica — Senior Stylist, 10 years experience" */
+  staffMembers: string[];
+  /** Specific quantitative claims e.g. "Over 500 clients", "15 years in business" */
+  stats: string[];
+  /** Certifications, awards, industry memberships, guarantees */
+  trustSignals: string[];
+  /** Named services with details/pricing if available */
+  services: string[];
+  /** Geographic targets or audience specifics e.g. "Newmarket, Auckland" */
+  locations: string[];
+}
+
 export interface AeoContent {
   title: string;
   metaDescription: string;
