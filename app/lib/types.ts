@@ -300,6 +300,11 @@ export interface JobState {
   strategistReport?: StrategistReport;
   /** Whether the brand theme has been committed to all page HTML (via apply-brand) */
   brandThemeApplied?: boolean;
+  /**
+   * Real E-E-A-T signals extracted from the original site during the pipeline.
+   * Persisted here so the download route can include them in hand-off documents.
+   */
+  realSiteContent?: RealSiteContent;
   phases: {
     extract: PhaseResult & {
       screenshotUrl?: string;

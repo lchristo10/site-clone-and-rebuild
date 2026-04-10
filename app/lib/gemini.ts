@@ -299,11 +299,17 @@ function buildPersonaGuidance(persona?: SitePersona): string {
 
   const lines: string[] = ['\nSITE PERSONA (5-dimension design + copy profile):'];
 
-  // Duel 1 — Layout
+  // Duel 1 — Layout + Content Volume
   if (persona.layout === 'spacious') {
-    lines.push('- LAYOUT: Spacious & Airy. Use generous whitespace and large typography scale. Fewer elements per section. Apple/Stripe/Linear aesthetic. Prioritise breathing room over information density.');
+    lines.push(
+      '- LAYOUT: Spacious & Airy. Use generous whitespace and large typography scale. Fewer elements per section. Apple/Stripe/Linear aesthetic. Prioritise breathing room over information density.' +
+      '\n  CONTENT VOLUME (STRICT): Minimal text — body copy per section must be 30–60 words maximum. Headings carry the weight; body text supports rather than repeats them. Hero and CTA sections must be a single punchy sentence plus CTA only. Prefer bullet lists of 3–5 short items (under 10 words each) over prose paragraphs. Do NOT write long explanatory paragraphs — trim ruthlessly.'
+    );
   } else {
-    lines.push('- LAYOUT: Information Dense. Pack value into every section. Bloomberg/product-dashboard aesthetic. More sections, tighter paragraphs. Lists over prose wherever possible.');
+    lines.push(
+      '- LAYOUT: Information Dense. Pack value into every section. Bloomberg/product-dashboard aesthetic. More sections, tighter paragraphs. Lists over prose wherever possible.' +
+      '\n  CONTENT VOLUME (STRICT): Rich, informative text — body copy per section should be 100–200 words. Use subheadings within sections where helpful. Bullet lists should have 5–8 items with a short descriptive phrase after each entry. FAQ sections must include 4–6 Q&A pairs with substantive answers (2–3 sentences each). Provide enough detail that a reader can fully understand and act without needing to visit another page.'
+    );
   }
 
   // Duel 2 — Tone
@@ -423,14 +429,27 @@ export async function generateAeoContent(
     ? `PAGE: Home (root page)\nPURPOSE: Introduce the business, establish credibility, and guide visitors to key sections.`
     : `PAGE: ${pageTitle}\nPURPOSE: ${pageIntent ?? `Dedicated ${pageTitle} page — deep, specific information about ${pageTitle.toLowerCase()} only.`}\n\nCRITICAL PAGE ISOLATION RULES:\n- This is the ${pageTitle} page, NOT the Home page. Do NOT write a generic business introduction.\n- Every section heading and body must be specific to "${pageTitle}" — not generic brand copy that repeats across pages.\n- The H1 must clearly identify this as the ${pageTitle} page (e.g. "${pageTitle} at ${entityMap.businessName}").\n- Do NOT reproduce the same hero intro or CTA text that appears on the Home page.\n- Focus exclusively on what a visitor landing directly on the ${pageTitle} page needs to know.`;
 
+  // ── Content volume rules — driven by Duel 1 (layout) persona ────────────────
+  const isDense = sitePersona?.layout === 'dense';
+  const sectionCountTarget = isDense ? '6–8' : '4–5';
+  const wordCountRule = isDense
+    ? '- Body copy per section: 100–200 words. Be thorough and informative — give the reader everything they need to act without visiting another page.'
+    : '- Body copy per section: 30–60 words maximum. Be minimal — headings carry the weight, body text supports only. Trim ruthlessly.';
+  const listSizeRule = isDense
+    ? '- For services/features: use isList:true with 5–8 bullet items, each with a short descriptive phrase.'
+    : '- For services/features: use isList:true with 3–5 bullet items of under 10 words each.';
+  const faqRule = isDense
+    ? '- For FAQ: use isList:true with 4–6 Q&A pairs; each answer should be 2–3 substantive sentences.'
+    : '- For FAQ: use isList:true with 3–4 Q&A pairs; keep answers to 1 concise sentence.';
+
   const sectionInstructions = plannedSections && plannedSections.length > 0
-    ? `4. sections: Generate EXACTLY ${plannedSections.length} sections following the SECTION BLUEPRINT above. Do not deviate.`
-    : `4. sections: Create 4-7 semantic sections. CRITICAL RULES:
+    ? `4. sections: Generate EXACTLY ${plannedSections.length} sections following the SECTION BLUEPRINT above. Do not deviate.\n   ${wordCountRule}`
+    : `4. sections: Create ${sectionCountTarget} semantic sections. CRITICAL RULES:
    - First section: answer-capsule style (40-60 words, declarative, inverted pyramid)
    - Use question-driven headings where appropriate (e.g. "What is X?", "How does Y work?")
-   - For services/features: use isList:true with bullet-style listItems
-   - For FAQ: use isList:true with question-answer format in listItems
-   - Keep body under 150 words per section for machine readability
+   ${listSizeRule}
+   ${faqRule}
+   ${wordCountRule}
    - section types: hero | features | services | about | testimonials | faq | cta | generic
    - headingLevel: "h2" for main sections, "h3" for subsections
    - IMPORTANT: Do NOT create a contact, address, or location section in the main content.

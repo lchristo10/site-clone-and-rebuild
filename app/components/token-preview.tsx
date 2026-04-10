@@ -49,9 +49,15 @@ interface SwatchRowProps {
   item: EditableColor;
   onDelete: () => void;
   onHexChange: (hex: string) => void;
+  /** Whether this core token can be promoted (swap hex with the row above) */
+  canPromote?: boolean;
+  /** Whether this core token can be demoted (swap hex with the row below) */
+  canDemote?: boolean;
+  onPromote?: () => void;
+  onDemote?: () => void;
 }
 
-function SwatchRow({ item, onDelete, onHexChange }: SwatchRowProps) {
+function SwatchRow({ item, onDelete, onHexChange, canPromote, canDemote, onPromote, onDemote }: SwatchRowProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(item.hex);
   const [error, setError] = useState(false);
@@ -72,6 +78,37 @@ function SwatchRow({ item, onDelete, onHexChange }: SwatchRowProps) {
 
   return (
     <div className="group flex items-center gap-2.5 py-1">
+
+      {/* Promote / Demote arrows — only for core tokens */}
+      {(onPromote || onDemote) && (
+        <div className="flex flex-col gap-0.5 flex-shrink-0">
+          <button
+            title={canPromote ? 'Promote: swap hex with token above' : undefined}
+            onClick={canPromote ? onPromote : undefined}
+            disabled={!canPromote}
+            className={`text-[10px] leading-none px-0.5 transition-all ${
+              canPromote
+                ? 'text-muted-foreground/50 hover:text-alias-green cursor-pointer'
+                : 'text-muted-foreground/15 cursor-default'
+            }`}
+          >
+            ▲
+          </button>
+          <button
+            title={canDemote ? 'Demote: swap hex with token below' : undefined}
+            onClick={canDemote ? onDemote : undefined}
+            disabled={!canDemote}
+            className={`text-[10px] leading-none px-0.5 transition-all ${
+              canDemote
+                ? 'text-muted-foreground/50 hover:text-alias-green cursor-pointer'
+                : 'text-muted-foreground/15 cursor-default'
+            }`}
+          >
+            ▼
+          </button>
+        </div>
+      )}
+
       {/* Swatch chip — click to edit */}
       <button
         title={editing ? undefined : `Click to edit ${item.hex}`}
@@ -246,6 +283,26 @@ export function TokenPreview({ tokens, entityMap, onColorsChange }: TokenPreview
     applyChange([...colorList, { key, label, hex }]);
   };
 
+  /**
+   * Swap the hex values of two adjacent core tokens.
+   * Only the hex values move — the role labels (key/label) stay fixed.
+   * e.g. promoting accent into primary position: accent hex moves up,
+   * primary hex moves down — so the roles are preserved but their colours swap.
+   */
+  const handleSwap = (indexA: number, indexB: number) => {
+    const updated = [...colorList];
+    const hexA = updated[indexA].hex;
+    updated[indexA] = { ...updated[indexA], hex: updated[indexB].hex };
+    updated[indexB] = { ...updated[indexB], hex: hexA };
+    applyChange(updated);
+  };
+
+  // Indices of core (readonly) tokens — only these support promote/demote
+  const coreIndices = colorList
+    .map((c, i) => ({ c, i }))
+    .filter(({ c }) => c.readonly)
+    .map(({ i }) => i);
+
   return (
     <div className="space-y-4 animate-fade-in-up">
       {/* Business identity */}
@@ -301,14 +358,25 @@ export function TokenPreview({ tokens, entityMap, onColorsChange }: TokenPreview
 
         {/* Editable rows */}
         <div className="space-y-1">
-          {colorList.map(item => (
-            <SwatchRow
-              key={item.key}
-              item={item}
-              onHexChange={hex => handleHexChange(item.key, hex)}
-              onDelete={() => handleDelete(item.key)}
-            />
-          ))}
+          {colorList.map((item, listIdx) => {
+            // Promote/demote only applies between adjacent core tokens
+            const corePos = coreIndices.indexOf(listIdx);
+            const isCore  = corePos !== -1;
+            const prevCoreIdx = isCore && corePos > 0                     ? coreIndices[corePos - 1] : -1;
+            const nextCoreIdx = isCore && corePos < coreIndices.length - 1 ? coreIndices[corePos + 1] : -1;
+            return (
+              <SwatchRow
+                key={item.key}
+                item={item}
+                onHexChange={hex => handleHexChange(item.key, hex)}
+                onDelete={() => handleDelete(item.key)}
+                canPromote={prevCoreIdx !== -1}
+                canDemote={nextCoreIdx !== -1}
+                onPromote={prevCoreIdx !== -1 ? () => handleSwap(listIdx, prevCoreIdx) : undefined}
+                onDemote={nextCoreIdx !== -1  ? () => handleSwap(listIdx, nextCoreIdx) : undefined}
+              />
+            );
+          })}
         </div>
 
         <AddSwatchRow onAdd={handleAdd} />

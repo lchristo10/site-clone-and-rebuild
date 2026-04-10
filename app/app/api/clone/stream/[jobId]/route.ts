@@ -488,6 +488,8 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
         let realSiteContent: RealSiteContent | undefined;
         try {
           realSiteContent = await extractRealSiteContent(realContentMarkdown);
+          // Persist to job store so download route can include it in hand-off docs
+          updateJob(jobId, { realSiteContent });
           emit({ phase: 'strategy', status: 'log', message:
             `✓ Real content extracted: ` +
             `${realSiteContent.staffMembers.length} staff, ` +
